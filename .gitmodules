@@ -1,0 +1,6 @@
+[submodule "web_app_demo_frontend"]
+	path = web_app_demo_frontend
+	url = https://github.com/uol-mediaprocessing-2023-2024-classroom/web_app_demo_frontend
+[submodule "web_app_demo_backend"]
+	path = web_app_demo_backend
+	url = https://github.com/uol-mediaprocessing-2023-2024-classroom/web_app_demo_backend.git
