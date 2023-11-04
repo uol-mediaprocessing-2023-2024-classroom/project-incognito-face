@@ -83,6 +83,24 @@ def apply_blur(img_path: str):
     blurImage = blurImage.filter(ImageFilter.BoxBlur(10))
     blurImage.save(img_path)
 
+
+def apply_vertical_edge(img_path: str):
+    verticalEdgeImage = Image.open(img_path)
+    verticalEdgeImage = verticalEdgeImage.filter(ImageFilter.Kernel((3, 3), (-1, 0, 1, -2, 0, 2, -1, 0, 1), 1, 0))
+    verticalEdgeImage.save(img_path)
+
+
+def apply_horizontal_edge(img_path: str):
+    horizontalEdgeImage = Image.open(img_path)
+    horizontalEdgeImage = horizontalEdgeImage.filter(ImageFilter.Kernel((3, 3), (-1, -2, -1, 0, 0, 0, 1, 2, 1), 1, 0))
+    horizontalEdgeImage.save(img_path)
+
+
+def apply_max_filter(img_path: str):
+    maxFilterImage = Image.open(img_path)
+    maxFilterImage = maxFilterImage.filter(ImageFilter.MaxFilter(3))
+    maxFilterImage.save(img_path)
+
 def highlight_face(img_path: str):
     img = cv2.imread(img_path)
     gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
