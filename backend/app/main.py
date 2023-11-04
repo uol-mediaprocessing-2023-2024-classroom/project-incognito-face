@@ -62,7 +62,6 @@ async def get_face(cldId: str, imgId: str, background_tasks: BackgroundTasks):
     image_url = f"https://cmp.photoprintit.com/api/photos/{imgId}.org?size=original&errorImage=false&cldId={cldId}&clientVersion=0.0.1-medienVerDemo"
 
     download_image(image_url, img_path)
-    apply_blur(img_path)
     highlight_face(img_path)
 
     # Schedule the image file to be deleted after the response is sent
