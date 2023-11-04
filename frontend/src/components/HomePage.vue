@@ -35,6 +35,10 @@
                             Apply Blur
                         </button>
 
+                        <button class="basicButton" @click="getFace(selectedImage.id)">
+                            Show Face
+                        </button>
+
                         <div>
                             <h3>Image Info:<br /></h3>
                             <p>
@@ -117,6 +121,9 @@ export default {
         // Emit a getBlur event with the ID of the selected image.
         getBlur(selectedId) {
             this.$emit("getBlur", selectedId, this.cldId);
+        },
+        getFace(selectedId) {
+            this.$emit("getFace", selectedId, this.cldId);
         },
 
         // --- AUTHENTICATION RELATED METHODS ---

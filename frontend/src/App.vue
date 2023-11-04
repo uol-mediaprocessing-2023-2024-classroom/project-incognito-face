@@ -4,7 +4,7 @@
             <!-- Communication between child and parent components can be done using props and events. Props are attributes passed from a parent to a child and can be used within it.
             A child component can emit events, which the parent then may react to. Here "selectedImage" is a prop passed to HomePage. HomePage emits the "fetchImgs" event,
             which triggers the fetchImgs method in App.vue. In this demo this is technically not needed, but since it's a core element of Vue I decided to include it.-->
-            <HomePage :selectedImage="selectedImage" :currentGallery="currentGallery" @loadImages="loadImages" @updateSelected="updateSelected" @getBlur="getBlur" @resetGallery="resetGallery" />
+            <HomePage :selectedImage="selectedImage" :currentGallery="currentGallery" @loadImages="loadImages" @updateSelected="updateSelected" @getBlur="getBlur" @getFace="getFace" @resetGallery="resetGallery" />
         </v-main>
     </v-app>
 </template>
@@ -12,6 +12,8 @@
 <script>
 import HomePage from "./components/HomePage";
 import placeholder from "./assets/placeholder.jpg";
+
+
 
 export default {
     name: "App",
@@ -108,6 +110,19 @@ export default {
             // Fetch the blurred image
             const response = await fetch(localUrl);
             const imageBlob = await response.blob();
+            const blurImgUrl = URL.createObjectURL(imageBlob);
+
+            // Update the selected image with the URL of the blurred image
+            this.selectedImage.url = blurImgUrl;
+        },
+
+        async getFace(selectedId, cldId) {
+            const localUrl = `http://127.0.0.1:8000/get-face/${cldId}/${selectedId}`;
+
+            // Fetch the blurred image
+            const response = await fetch(localUrl);
+            const imageBlob = await response.blob();
+
             const blurImgUrl = URL.createObjectURL(imageBlob);
 
             // Update the selected image with the URL of the blurred image
