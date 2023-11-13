@@ -18,6 +18,8 @@ ssl._create_default_https_context = ssl._create_unverified_context
 origins = [
     "https://localhost:8080",
     "http://localhost:8080",
+    "http://localhost:8081",
+    "https://localhost:8081"
 ]
 
 app.add_middleware(
@@ -68,7 +70,6 @@ async def get_face(cldId: str, imgId: str, background_tasks: BackgroundTasks):
 
     # Schedule the image file to be deleted after the response is sent
     background_tasks.add_task(remove_file, img_path)
-
     # Send the blurred image file as a response
     return FileResponse(img_path)
 
