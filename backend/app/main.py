@@ -1,5 +1,6 @@
 import os
 import ssl
+import dlib
 import urllib.request
 
 from fastapi import FastAPI, BackgroundTasks, Request
@@ -7,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image, ImageFilter
 import cv2
-
 
 app = FastAPI()
 
@@ -52,6 +52,8 @@ async def get_blur(cldId: str, imgId: str, background_tasks: BackgroundTasks):
 
     # Send the blurred image file as a response
     return FileResponse(img_path)
+
+
 @app.get("/get-face/{cldId}/{imgId}")
 async def get_face(cldId: str, imgId: str, background_tasks: BackgroundTasks):
     """
@@ -62,7 +64,7 @@ async def get_face(cldId: str, imgId: str, background_tasks: BackgroundTasks):
     image_url = f"https://cmp.photoprintit.com/api/photos/{imgId}.org?size=original&errorImage=false&cldId={cldId}&clientVersion=0.0.1-medienVerDemo"
 
     download_image(image_url, img_path)
-    highlight_face(img_path)
+    highlight_face_hog_svm(img_path)
 
     # Schedule the image file to be deleted after the response is sent
     background_tasks.add_task(remove_file, img_path)
@@ -100,13 +102,26 @@ def apply_max_filter(img_path: str):
     maxFilterImage = maxFilterImage.filter(ImageFilter.MaxFilter(3))
     maxFilterImage.save(img_path)
 
-def highlight_face(img_path: str):
+
+def highlight_face_haar(img_path: str):
     img = cv2.imread(img_path)
     gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     face = face_classifier.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
     for (x, y, w, h) in face:
         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 4)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    Image.fromarray(img_rgb).save(img_path)
+
+
+def highlight_face_hog_svm(img_path: str):
+    img = cv2.imread(img_path)
+    gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    detector = dlib.get_frontal_face_detector()
+    faces = detector(gray_image)
+    for face in faces:
+        x, y, w, h = face.left(), face.top(), face.width(), face.height()
+        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     Image.fromarray(img_rgb).save(img_path)
 
