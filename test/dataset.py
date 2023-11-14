@@ -3,9 +3,10 @@ from typing import Callable
 import cv2
 import numpy as np
 import dlib
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 from sklearn import datasets
 from matplotlib import pyplot as plt
+import ImageModification as imod
 
 
 def get_faces():
@@ -31,18 +32,15 @@ def count_detected_faces_haar(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
         if len(detected_faces) > 0:
             counter_faces += 1
 
-    print("From " + str(len(faces.images)) + " Faces the Haar algorithm detected " + str(counter_faces) + " Faces")
+    return float(counter_faces) / float(len(faces.images))
 
 
 def count_detected_faces_hog(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
     faces = get_faces()
     detector = dlib.get_frontal_face_detector()
     counter_faces = 0
-    plt.matshow(faces.images[0])
-    plt.show()
 
     for possibleFace in faces.images:
-
         scaled_rgb_image = (possibleFace * 255).astype(np.uint8)
 
         modifiedImage = image_mod_fn(scaled_rgb_image)
@@ -51,21 +49,31 @@ def count_detected_faces_hog(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
 
         if len(detected_faces) > 0:
             counter_faces += 1
-
     print("From " + str(len(faces.images)) + " Faces the HOG algorithm detected " + str(counter_faces) + " Faces")
+    return float(counter_faces) / float(len(faces.images))
 
 
-def apply_blur(image: np.ndarray):
-    pilImage = Image.fromarray(image)
-    pilImage = pilImage.filter(ImageFilter.BoxBlur(10))
-    return np.array(pilImage)
+def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray], np.ndarray]], float], title: str):
+    categories = ["Unmodified", "Blur", "Rotate 20°", "Rotate 90°", "Flip Horizontally", "Change to Grayscale"]
+    values = [count_detected_faces(imod.identity), count_detected_faces(imod.apply_blur),
+              count_detected_faces(imod.create_rotate_image(20)),
+              count_detected_faces(imod.create_rotate_image(90)), count_detected_faces(imod.flip_image_horizontally),
+              count_detected_faces(imod.change_to_grayscale)]
+
+    # Create bar chart
+    plt.figure(figsize=(8, 6))
+    plt.bar(categories, values, color='skyblue')
+    plt.ylim(0, 1.0)
+
+    # Title and labels
+    plt.title(title)
+    plt.xlabel('Modification Operations')
+    plt.ylabel('Proportion detected')
+
+    # Show plot
+    plt.xticks(rotation=45)  # Rotate x-axis labels for better visibility
+    plt.tight_layout()
+    plt.show()
 
 
-def rotate_image(image: np.ndarray):
-    pilImage = Image.fromarray(image)
-    pilImage = pilImage.rotate(angle=10)
-    return np.array(pilImage)
-
-
-count_detected_faces_haar(rotate_image)
-count_detected_faces_hog(rotate_image)
+image_modification_plot(count_detected_faces_hog, 'HOG modifications')
