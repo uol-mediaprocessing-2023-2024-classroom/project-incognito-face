@@ -33,6 +33,52 @@
                     </div>
                 </div>
             </div>
+            <div>
+            <table>
+                <thead>
+                <tr>
+                    <th class="resultTable">
+                        <div class="resultImgInfo">
+                            <h2>Result<br /></h2>
+                        </div>
+                    </th>
+                    <th class="resultTable">
+                        <div class="resultImgInfo">
+                            <h2>Info<br /></h2>
+                        </div>                    
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td class="resultTable">
+                        <img class="resultImg" v-bind:src="faceResult['viola-jones'].url" />
+                    </td>
+                    <td class="resultTable">
+                        <div>
+                            <h3>Viola-Jones<br /></h3>
+                            <p>
+                                {{ faceResultInfo['viola-jones'].percentage }}
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="resultTable">
+                        <img class="resultImg" v-bind:src="faceResult['hog-svn'].url" />
+                    </td>
+                    <td class="resultTable">
+                        <div>
+                            <h3>HOG-SVM<br /></h3>
+                            <p>
+                                {{ faceResultInfo['hog-svn'].percentage }}
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="imageGalleryField">
@@ -64,12 +110,21 @@ export default {
                 name: "",
                 timestamp: ""
             },
+            faceResultInfo: {
+                "viola-jones": {
+                    percentage: ""
+                },
+                "hog-svn": {
+                    percentage: ""
+                }
+            }
         };
     },
 
     props: {
         selectedImage: Object,
         currentGallery: Array,
+        faceResult: Object
     },
 
     methods: {
@@ -88,7 +143,6 @@ export default {
 
         // Emit a getBlur event with the ID of the selected image.
         getBlur(imgName) {
-            console.log(imgName);
             this.$emit("getBlur", imgName);
         },
         getFace(imgName) {
@@ -113,6 +167,14 @@ export default {
             const timestamp = this.selectedImage.timestamp > 0 ? new Date(this.selectedImage.timestamp * 1000).toLocaleString('de-DE', { hour12: false }) : '';
             this.imageInfo = { name: `Name: ${this.selectedImage.name}`, timestamp: `Timestamp: ${timestamp}` };
         },
+        faceResult: {
+            handler: function () {
+                Object.keys(this.faceResult).forEach((key) => {
+                    this.faceResultInfo[key].percentage = this.faceResult[key].percentage + "%";
+                });
+            },
+            deep: true,
+        }
     }
 };
 </script>
@@ -150,6 +212,15 @@ export default {
     margin-left: 10px;
 }
 
+.resultImg {
+    max-width: 200px;
+    max-height: 200px;
+}
+
+.resultTable {
+    width:200px;
+}
+
 .basicButton {
     background-color: rgb(226, 215, 215);
     padding: 0px 4px 0px 4px;
@@ -168,7 +239,7 @@ export default {
     display: flex;
     flex-direction: column;
     margin-left: 10px;
-    width: 400px;
+    width: 200px;
 }
 
 .inputField * {
