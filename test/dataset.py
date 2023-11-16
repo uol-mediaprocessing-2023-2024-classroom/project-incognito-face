@@ -17,8 +17,6 @@ def count_detected_faces_haar(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
     faces = get_faces()
     face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     counter_faces = 0
-    plt.matshow(faces.images[0])
-    plt.show()
 
     for possibleFace in faces.images:
 
@@ -31,7 +29,8 @@ def count_detected_faces_haar(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
 
         if len(detected_faces) > 0:
             counter_faces += 1
-    print("From " + str(len(faces.images)) + " Faces the HAAR algorithm detected " + str(counter_faces) + " Faces")
+
+    print("From " + str(len(faces.images)) + " Faces the Haar algorithm detected " + str(counter_faces) + " Faces")
     return float(counter_faces) / float(len(faces.images))
 
 
@@ -49,6 +48,7 @@ def count_detected_faces_hog(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
 
         if len(detected_faces) > 0:
             counter_faces += 1
+
     print("From " + str(len(faces.images)) + " Faces the HOG algorithm detected " + str(counter_faces) + " Faces")
     return float(counter_faces) / float(len(faces.images))
 
@@ -76,4 +76,10 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
     plt.show()
 
 
-count_detected_faces_hog(imod.identity)
+# image_modification_plot(count_detected_faces_hog, 'HOG modifications')
+
+#count_detected_faces_haar(imod.blur_edges)
+#count_detected_faces_hog(imod.blur_edges)
+
+
+imod.blur_edges((get_faces().images[0] * 255).astype(np.uint8))
