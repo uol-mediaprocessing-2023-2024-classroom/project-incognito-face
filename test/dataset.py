@@ -31,7 +31,7 @@ def count_detected_faces_haar(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
 
         if len(detected_faces) > 0:
             counter_faces += 1
-
+    print("From " + str(len(faces.images)) + " Faces the HAAR algorithm detected " + str(counter_faces) + " Faces")
     return float(counter_faces) / float(len(faces.images))
 
 
@@ -76,4 +76,4 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
     plt.show()
 
 
-image_modification_plot(count_detected_faces_hog, 'HOG modifications')
+count_detected_faces_hog(imod.identity)
