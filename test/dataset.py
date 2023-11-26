@@ -53,6 +53,30 @@ def count_detected_faces_hog(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
     return float(counter_faces) / float(len(faces.images))
 
 
+# http://dlib.net/cnn_face_detector.py.html
+def count_detected_faces_cnn(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
+    faces = get_faces()
+    detector = dlib.cnn_face_detection_model_v1("mmod_human_face_detector.dat")
+    counter_faces = 0
+
+    for possibleFace in faces.images:
+        scaled_rgb_image = (possibleFace * 255).astype(np.uint8)
+
+        modifiedImage = image_mod_fn(scaled_rgb_image)
+
+        # The 1 in the second argument indicates that we should upsample the image
+        # 1 time.  This will make everything bigger and allow us to detect more
+        # faces.
+        # detected_faces = detector(modifiedImage, 1)
+        detected_faces = detector(modifiedImage)
+
+        if len(detected_faces) > 0:
+            counter_faces += 1
+
+    print("From " + str(len(faces.images)) + " Faces the CNN algorithm detected " + str(counter_faces) + " Faces")
+    return float(counter_faces) / float(len(faces.images))
+
+
 def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray], np.ndarray]], float], title: str):
     categories = ["Unmodified", "Blur", "Rotate 20°", "Rotate 90°", "Flip Horizontally", "Change to Grayscale"]
     values = [count_detected_faces(imod.identity), count_detected_faces(imod.apply_blur),
@@ -78,8 +102,9 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
 
 # image_modification_plot(count_detected_faces_hog, 'HOG modifications')
 
-#count_detected_faces_haar(imod.blur_edges)
-#count_detected_faces_hog(imod.blur_edges)
+# count_detected_faces_haar(imod.blur_edges)
+# count_detected_faces_hog(imod.blur_edges)
 
+image_modification_plot(count_detected_faces_cnn, 'CNN modifications')
 
-imod.blur_edges((get_faces().images[0] * 255).astype(np.uint8))
+# imod.blur_edges((get_faces().images[0] * 255).astype(np.uint8))
