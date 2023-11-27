@@ -1,15 +1,12 @@
-
 from typing import Callable
 
 import cv2
 import numpy as np
 import dlib
-import pandas as pd
 from PIL import Image, ImageFilter, ImageOps
 from sklearn import datasets
 from matplotlib import pyplot as plt
 import ImageModification as imod
-from deepface import DeepFace
 
 
 def get_faces():
@@ -132,13 +129,42 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
     plt.tight_layout()
     plt.show()
 
+def find_face_with_hog(image: np.ndarray):
+    #detector = dlib.cnn_face_detection_model_v1("mmod_human_face_detector.dat")
+    detector = dlib.get_frontal_face_detector()
+
+    # The 1 in the second argument indicates that we should upsample the image
+    # 1 time.  This will make everything bigger and allow us to detect more
+    # faces.
+    # detected_faces = detector(modifiedImage, 1)
+    detected_faces = detector(image)
+    for face in detected_faces:
+        x, y, w, h = face.left(), face.top(), face.width(), face.height()
+        return x, y, x + w, y + h - 250
+
+def apply_face_modification(image, coordinates):
+    foreground = Image.open('../images/sunglasses.png')
+    foreground = foreground.resize(size=(coordinates[2] - coordinates[0], coordinates[3] - coordinates[1]))
+    print(coordinates[3] - coordinates[1])
+    print(foreground.size)
+    image.paste(foreground, coordinates, mask=foreground)
+    return image
+
+
+
+
+test_face = Image.open('../images/olaf.jpg')
+coordinates = find_face_with_hog(np.array(test_face))
+plt.imshow(apply_face_modification(test_face, coordinates))
+plt.show()
+
 
 # image_modification_plot(count_detected_faces_hog, 'HOG modifications')
 
 # count_detected_faces_haar(imod.blur_edges)
 # count_detected_faces_hog(imod.blur_edges)
 
-image_modification_plot(count_detected_faces_cnn, 'CNN modifications')
+#image_modification_plot(count_detected_faces_cnn, 'CNN modifications')
 
 # image_modification_plot(count_detected_faces_ssd, 'SSD modifications')
 
