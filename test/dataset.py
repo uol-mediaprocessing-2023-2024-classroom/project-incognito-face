@@ -1,12 +1,15 @@
+
 from typing import Callable
 
 import cv2
 import numpy as np
 import dlib
+import pandas as pd
 from PIL import Image, ImageFilter, ImageOps
 from sklearn import datasets
 from matplotlib import pyplot as plt
 import ImageModification as imod
+from deepface import DeepFace
 
 
 def get_faces():
@@ -77,6 +80,36 @@ def count_detected_faces_cnn(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
     return float(counter_faces) / float(len(faces.images))
 
 
+# https://sefiks.com/2020/08/25/deep-face-detection-with-opencv-in-python/
+def count_detected_faces_ssd(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
+    faces = get_faces()
+    detector = cv2.dnn.readNetFromCaffe("deploy.prototxt", "res10_300x300_ssd_iter_140000.caffemodel")
+    counter_faces = 0
+
+    for possibleFace in faces.images:
+        scaled_rgb_image = (possibleFace * 255).astype(np.uint8)
+        resized_scaled_rgb_image = cv2.resize(scaled_rgb_image, (300, 300))
+
+        modifiedImage = image_mod_fn(resized_scaled_rgb_image)
+
+        imageBlob = cv2.dnn.blobFromImage(image=modifiedImage)
+
+        detector.setInput(imageBlob)
+        detections = detector.forward()
+
+        found_face = False
+        for row in detections[0][0]:
+            if row[2] > 0.90:
+                found_face = True
+                break
+
+        if found_face > 0:
+            counter_faces += 1
+
+    print("From " + str(len(faces.images)) + " Faces the SSD algorithm detected " + str(counter_faces) + " Faces")
+    return float(counter_faces) / float(len(faces.images))
+
+
 def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray], np.ndarray]], float], title: str):
     categories = ["Unmodified", "Blur", "Rotate 20°", "Rotate 90°", "Flip Horizontally", "Change to Grayscale"]
     values = [count_detected_faces(imod.identity), count_detected_faces(imod.apply_blur),
@@ -106,5 +139,7 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
 # count_detected_faces_hog(imod.blur_edges)
 
 image_modification_plot(count_detected_faces_cnn, 'CNN modifications')
+
+# image_modification_plot(count_detected_faces_ssd, 'SSD modifications')
 
 # imod.blur_edges((get_faces().images[0] * 255).astype(np.uint8))
