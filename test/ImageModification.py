@@ -96,3 +96,6 @@ def apply_bilateral_filter(image):
 
 def identity(image: np.ndarray):
     return image
+
+
+

@@ -129,8 +129,9 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
     plt.tight_layout()
     plt.show()
 
+
 def find_face_with_hog(image: np.ndarray):
-    #detector = dlib.cnn_face_detection_model_v1("mmod_human_face_detector.dat")
+    # detector = dlib.cnn_face_detection_model_v1("mmod_human_face_detector.dat")
     detector = dlib.get_frontal_face_detector()
 
     # The 1 in the second argument indicates that we should upsample the image
@@ -138,33 +139,40 @@ def find_face_with_hog(image: np.ndarray):
     # faces.
     # detected_faces = detector(modifiedImage, 1)
     detected_faces = detector(image)
+
+    box_coords_faces = []
     for face in detected_faces:
         x, y, w, h = face.left(), face.top(), face.width(), face.height()
-        return x, y, x + w, y + h - 250
+        box_coords_faces.append((x, y, x + w, y + h))
+    return box_coords_faces
+
 
 def apply_face_modification(image, coordinates):
     foreground = Image.open('../images/sunglasses.png')
-    foreground = foreground.resize(size=(coordinates[2] - coordinates[0], coordinates[3] - coordinates[1]))
-    print(coordinates[3] - coordinates[1])
-    print(foreground.size)
-    image.paste(foreground, coordinates, mask=foreground)
+
+    for coords in coordinates:
+        cur_height = coords[3] - coords[1]
+        coords = coords[0], coords[1] + int(1 / 5 * cur_height), coords[2], coords[3] - int(3 / 5 * cur_height)
+        width = coords[2] - coords[0]
+        height = coords[3] - coords[1]
+        resized_foreground = foreground.resize(size=(width, height))
+        print(coords[3] - coords[1])
+        print(resized_foreground.size)
+        image.paste(resized_foreground, coords, mask=resized_foreground)
     return image
 
 
-
-
-test_face = Image.open('../images/olaf.jpg')
-coordinates = find_face_with_hog(np.array(test_face))
-plt.imshow(apply_face_modification(test_face, coordinates))
+test_face = Image.open('../images/politician.jpg')
+all_coordinates = find_face_with_hog(np.array(test_face))
+plt.imshow(apply_face_modification(test_face, all_coordinates))
 plt.show()
-
 
 # image_modification_plot(count_detected_faces_hog, 'HOG modifications')
 
 # count_detected_faces_haar(imod.blur_edges)
 # count_detected_faces_hog(imod.blur_edges)
 
-#image_modification_plot(count_detected_faces_cnn, 'CNN modifications')
+# image_modification_plot(count_detected_faces_cnn, 'CNN modifications')
 
 # image_modification_plot(count_detected_faces_ssd, 'SSD modifications')
 
