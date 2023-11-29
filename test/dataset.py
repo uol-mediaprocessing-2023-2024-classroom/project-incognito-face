@@ -1,3 +1,5 @@
+import io
+from contextlib import redirect_stdout
 from typing import Callable
 
 import cv2
@@ -7,7 +9,7 @@ from PIL import Image, ImageFilter, ImageOps
 from sklearn import datasets
 from matplotlib import pyplot as plt
 import ImageModification as imod
-
+from mtcnn.mtcnn import MTCNN
 
 def get_faces():
     return datasets.fetch_lfw_people(color=True, min_faces_per_person=100, resize=1)
@@ -107,6 +109,29 @@ def count_detected_faces_ssd(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
     return float(counter_faces) / float(len(faces.images))
 
 
+# https://www.kaggle.com/code/jake126/face-detection-using-cnn-with-the-lfw-dataset
+def count_detected_faces_mtcnn(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
+    faces = get_faces()
+    detector = MTCNN()
+    counter_faces = 0
+
+    for possibleFace in faces.images:
+        scaled_rgb_image = (possibleFace * 255).astype(np.uint8)
+
+        modifiedImage = image_mod_fn(scaled_rgb_image)
+
+        # Disable printing
+        with io.StringIO() as dummy_stdout:
+            with redirect_stdout(dummy_stdout):
+                detected_faces = detector.detect_faces(modifiedImage)
+
+        if len(detected_faces) > 0:
+            counter_faces += 1
+
+    print("From " + str(len(faces.images)) + " Faces the MTCNN algorithm detected " + str(counter_faces) + " Faces")
+    return float(counter_faces) / float(len(faces.images))
+
+
 def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray], np.ndarray]], float], title: str):
     categories = ["Unmodified", "Blur", "Rotate 20°", "Rotate 90°", "Flip Horizontally", "Change to Grayscale"]
     values = [count_detected_faces(imod.identity), count_detected_faces(imod.apply_blur),
@@ -128,6 +153,33 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
     plt.xticks(rotation=45)  # Rotate x-axis labels for better visibility
     plt.tight_layout()
     plt.show()
+
+
+def find_face_with_mtcnn(image: np.ndarray):
+    detector = MTCNN()
+
+    # Disable printing
+    with io.StringIO() as dummy_stdout:
+        with redirect_stdout(dummy_stdout):
+            detected_faces = detector.detect_faces(image)
+
+    box_coords_faces = []
+    for face in detected_faces:
+        bbox = face['box']
+        #keypoints = face['keypoints']
+
+        #cv2.rectangle(image, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), (0, 255, 0), 2)
+        #cv2.circle(image, (keypoints['left_eye']), 2, (0, 255, 0), 2)
+        #cv2.circle(image, (keypoints['right_eye']), 2, (0, 255, 0), 2)
+        #cv2.circle(image, (keypoints['nose']), 2, (0, 255, 0), 2)
+        #cv2.circle(image, (keypoints['mouth_left']), 2, (0, 255, 0), 2)
+        #cv2.circle(image, (keypoints['mouth_right']), 2, (0, 255, 0), 2)
+        box_coords_faces.append((bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]))
+
+    plt.imshow(image)
+    plt.show()
+
+    return box_coords_faces
 
 
 def find_face_with_hog(image: np.ndarray):
@@ -163,7 +215,7 @@ def apply_face_modification(image, coordinates):
 
 
 test_face = Image.open('../images/politician.jpg')
-all_coordinates = find_face_with_hog(np.array(test_face))
+all_coordinates = find_face_with_mtcnn(np.array(test_face))
 plt.imshow(apply_face_modification(test_face, all_coordinates))
 plt.show()
 
@@ -175,5 +227,8 @@ plt.show()
 # image_modification_plot(count_detected_faces_cnn, 'CNN modifications')
 
 # image_modification_plot(count_detected_faces_ssd, 'SSD modifications')
+
+image_modification_plot(count_detected_faces_mtcnn, 'MTCNN modifications')
+
 
 # imod.blur_edges((get_faces().images[0] * 255).astype(np.uint8))
