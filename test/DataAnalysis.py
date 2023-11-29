@@ -131,11 +131,10 @@ def count_detected_faces_mtcnn(image_mod_fn: Callable[[np.ndarray], np.ndarray])
 
 
 def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray], np.ndarray]], float], title: str):
-    categories = ["Unmodified", "Blur", "Rotate 20°", "Rotate 90°", "Flip Horizontally", "Change to Grayscale"]
+    categories = ["Unmodified", "Blur", "Rotate 20°", "Rotate 90°", "Flip Horizontally"]
     values = [count_detected_faces(imod.identity), count_detected_faces(imod.apply_blur),
               count_detected_faces(imod.create_rotate_image(20)),
-              count_detected_faces(imod.create_rotate_image(90)), count_detected_faces(imod.flip_image_horizontally),
-              count_detected_faces(imod.change_to_grayscale)]
+              count_detected_faces(imod.create_rotate_image(90)), count_detected_faces(imod.flip_image_horizontally)]
 
     # Create bar chart
     plt.figure(figsize=(8, 6))
@@ -153,11 +152,6 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
     plt.show()
 
 
-#test_face = Image.open('../images/politician.jpg')
-#all_coordinates = find_face_with_mtcnn(np.array(test_face))
-#plt.imshow(apply_face_modification(test_face, all_coordinates))
-#plt.show()
-
 # image_modification_plot(count_detected_faces_hog, 'HOG modifications')
 
 # count_detected_faces_haar(imod.blur_edges)
@@ -167,7 +161,7 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
 
 # image_modification_plot(count_detected_faces_ssd, 'SSD modifications')
 
-#image_modification_plot(count_detected_faces_mtcnn, 'MTCNN modifications')
+# image_modification_plot(count_detected_faces_mtcnn, 'MTCNN modifications')
 
 
 # imod.blur_edges((get_faces().images[0] * 255).astype(np.uint8))
