@@ -6,9 +6,11 @@
         :selectedFilter="selectedFilter"
         :currentGallery="currentGallery"
         :currentFilters="currentFilters"
+        :currentAlgorithms="currentAlgorithms"
         :faceResult="faceResult"
         @loadImages="loadImages"
         @loadFilters="loadFilters"
+        @loadAlgorithms="loadAlgorithms"
         @selectImage="selectImage"
         @selectFilter="selectFilter"
         @applyFilter="applyFilter"
@@ -36,16 +38,7 @@ export default {
       currentGallery: [],
       currentFilters: [],
       currentAlgorithms: [],
-      faceResult: {
-        "viola-jones": {
-          url: "",
-          percentage: "",
-        },
-        "hog-svn": {
-          url: "",
-          percentage: "",
-        },
-      },
+      faceResult: [],
       allImgData: [],
       limit: 60,
       loadedAmount: 0,
@@ -69,7 +62,7 @@ export default {
 
     async loadAlgorithms() {
       const response = await fetch("http://127.0.0.1:8000/get-algorithms");
-      this.currentFilters = await response.json();
+      this.currentAlgorithms = await response.json();
     },
 
     async selectImage(image) {
@@ -101,20 +94,24 @@ export default {
     },
 
     async runFaceDetection(image) {
-      const localUrl = `http://127.0.0.1:8000/get-face-data/${imgName}`;
-      const response = await fetch(localUrl);
-      const jsonResponse = await response.json();
-      Object.keys(this.faceResult).forEach((key) => {
-        this.faceResult[key].url = `http://127.0.0.1:8000/${jsonResponse[key].url}`;
-        this.faceResult[key].percentage = jsonResponse[key].percentage;
+      if (image == null) {
+        return;
+      }
+      const requestBody = {
+        base64: image.base64,
+      };
+      const response = await fetch("http://127.0.0.1:8000/run-face-detection", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
       });
+      this.faceResult = await response.json();
     },
 
     resetGallery() {
-      this.selectedImage = {
-        url: placeholder,
-        id: "placeholder",
-      };
+      this.selectedImage = require("@/assets/placeholder.json");
       this.currentGallery = [];
       this.faceResult = [];
     },

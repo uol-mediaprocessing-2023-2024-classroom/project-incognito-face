@@ -3,6 +3,7 @@ import ssl
 import dlib
 import base64
 import urllib.request
+import concurrent.futures 
 
 from fastapi import FastAPI, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,30 @@ import numpy
 
 app = FastAPI()
 IMAGE_PATH = Path(__file__).parent.parent.parent / 'images'
+FACE_DETECTION_ALGORITHMS = [
+        {
+            'name': 'viola-jones',
+            'displayName': 'Viola Jones'
+        },
+        {
+            'name': 'hog-svn',
+            'displayName': 'HOG-SVN'
+        }
+    ]
+FILTERS = [
+        {
+            'name': 'blur',
+            'displayName': 'Blur'
+        },
+        {
+            'name': 'horizontalEdge',
+            'displayName': 'Horizontal Edges'
+        },
+        {
+            'name': 'verticalEdge',
+            'displayName': 'Vertical Edges'
+        }
+    ]
 
 # SSL configuration for HTTPS requests
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -52,24 +77,6 @@ async def get_images():
         image_data_list.append(image_data)
     return JSONResponse(content=image_data_list)
 
-@app.get('/get-filters')
-async def get_filters():
-    response = [
-        {
-            'name': 'blur',
-            'displayName': 'Blur'
-        },
-        {
-            'name': 'horizontalEdge',
-            'displayName': 'Horizontal Edges'
-        },
-        {
-            'name': 'verticalEdge',
-            'displayName': 'Vertical Edges'
-        }
-    ]
-    return JSONResponse(content=response)
-
 def get_image_data(img_path):
     with open(img_path, 'rb') as image_file:
         base64_encoded = base64.b64encode(image_file.read()).decode("utf-8")
@@ -78,6 +85,14 @@ def get_image_data(img_path):
         'timestamp': os.path.getmtime(img_path),
         'base64': f'data:image/png;base64,{base64_encoded}'
         }
+
+@app.get('/get-filters')
+async def get_filters():
+    return JSONResponse(content=FILTERS)
+
+@app.get('/get-algorithms')
+async def get_algorithms():
+    return JSONResponse(content=FACE_DETECTION_ALGORITHMS)
 
 class FilterRequestData(BaseModel):
     filter: str
@@ -97,42 +112,36 @@ async def apply_filter(data: FilterRequestData):
     img.save(img_bytes_io, format='JPEG')
     return JSONResponse(content={'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}'})
 
+class RunFaceDetectionRequestData(BaseModel):
+    base64: str
 
-@app.get('/get-face-data/{img_name}')
-async def get_face_data(img_name: str):
-    # Percentages are just dummies rn
-    response = {
-        'viola-jones': {
-            'url': f'get-face/viola-jones/{img_name}',
-            'percentage': '100'
-        },
-        'hog-svn': {
-            'url': f'get-face/hog-svn/{img_name}',
-            'percentage': '100'
-        }
+@app.post('/run-face-detection')
+async def get_face_data(data: RunFaceDetectionRequestData):
+    result = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(process_algorithm, algorithm, data.base64) for algorithm in FACE_DETECTION_ALGORITHMS]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                result.append(future.result())
+            except Exception as e:
+                print(f'An error occurred while trying to run multi-threaded face detection: {e}')
+    return JSONResponse(content=result)
+
+def process_algorithm(algorithm, img):
+    img = Image.open(BytesIO(base64.b64decode(img[22:])))
+    match algorithm['name']:
+        case 'viola-jones':
+            img, has_face, confidence = highlight_face_viola_jones(img)
+        case 'hog-svn':
+            img, has_face, confidence = highlight_face_hog_svm(img)
+    img_bytes_io = BytesIO()
+    img.save(img_bytes_io, format='JPEG')
+    return {
+        'name': algorithm['name'],
+        'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}',
+        'has_face': has_face,
+        'confidence': confidence
     }
-    return JSONResponse(content=response)
-
-
-@app.get('/get-face/viola-jones/{img_name}')
-async def get_face_viola_jones(img_name: str):
-    img = Image.open(IMAGE_PATH / img_name)
-    img = highlight_face_viola_jones(img)
-    img_bytes_io = BytesIO()
-    img.save(img_bytes_io, format='JPEG')
-    return StreamingResponse(BytesIO(img_bytes_io.getvalue()))
-
-
-@app.get('/get-face/hog-svn/{img_name}')
-async def get_face_hog_svn(img_name: str):
-    img = Image.open(IMAGE_PATH / img_name)
-    img = highlight_face_hog_svm(img)
-    img_bytes_io = BytesIO()
-    img.save(img_bytes_io, format='JPEG')
-    return StreamingResponse(BytesIO(img_bytes_io.getvalue()))
-
-
-
 
 
 # Opens the image from the given path and applies a box blur effect.
@@ -164,7 +173,7 @@ def highlight_face_viola_jones(img: Image):
     for (x, y, w, h) in face:
         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 6)
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(img_rgb)
+    return Image.fromarray(img_rgb), True, 100
 
 
 def highlight_face_hog_svm(img: Image):
@@ -176,7 +185,7 @@ def highlight_face_hog_svm(img: Image):
         x, y, w, h = face.left(), face.top(), face.width(), face.height()
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 6)
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(img_rgb)
+    return Image.fromarray(img_rgb), False, 50
 
 
 # Global exception handler that catches all exceptions not handled by specific exception handlers.

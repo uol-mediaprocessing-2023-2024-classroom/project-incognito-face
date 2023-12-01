@@ -19,7 +19,10 @@
                 </v-btn>
               </template>
               <v-list>
-                <v-list-item v-for="(filter, index) in filters" :key="index">
+                <v-list-item
+                  v-for="(filter, index) in currentFilters ? currentFilters : []"
+                  :key="index"
+                >
                   <v-list-item-content @click="selectFilter(filter)">
                     <v-list-item-title>{{ filter.displayName }}</v-list-item-title>
                   </v-list-item-content>
@@ -29,17 +32,23 @@
             <button class="basicButton" @click="applyFilter(selectedImage)">
               Apply Filter
             </button>
-            <button class="basicButton" @click="runFaceDetection(selectedImage.name)">
-              Detect Face
+            <button class="basicButton" @click="runFaceDetection(selectedImage)">
+              Run Face Detection
             </button>
 
             <div>
               <h3>Image Info:<br /></h3>
               <p>
-                {{ imageInfo.name }}
+                {{ selectedImage ? selectedImage.name : "" }}
               </p>
               <p>
-                {{ imageInfo.timestamp }}
+                {{
+                  selectedImage && selectedImage.timestamp > 0
+                    ? new Date(
+                        this.selectedImage.timestamp * 1000
+                      ).toLocaleString("de-DE", { hour12: false })
+                    : ""
+                }}
               </p>
             </div>
           </div>
@@ -62,28 +71,34 @@
             </tr>
           </thead>
           <tbody>
-            <tr>
+            <tr v-for="algorithm in currentAlgorithms" :key="algorithm.name">
               <td class="resultTable">
-                <img class="resultImg" v-bind:src="faceResult['viola-jones'].url" />
+                <img
+                  class="resultImg"
+                  :src="
+                    getFaceImage(algorithm.name)
+                      ? getFaceImage(algorithm.name).base64
+                      : ''
+                  "
+                />
               </td>
               <td class="resultTable">
                 <div>
-                  <h3>Viola-Jones<br /></h3>
+                  <h3>{{ algorithm.displayName }}<br /></h3>
                   <p>
-                    {{ faceResultInfo["viola-jones"].percentage }}
-                  </p>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td class="resultTable">
-                <img class="resultImg" v-bind:src="faceResult['hog-svn'].url" />
-              </td>
-              <td class="resultTable">
-                <div>
-                  <h3>HOG-SVM<br /></h3>
-                  <p>
-                    {{ faceResultInfo["hog-svn"].percentage }}
+                    Has Face:
+                    {{
+                      getFaceImage(algorithm.name)
+                        ? getFaceImage(algorithm.name).has_face
+                        : "?"
+                    }}
+                    <br />
+                    Confidence:
+                    {{
+                      getFaceImage(algorithm.name)
+                        ? getFaceImage(algorithm.name).confidence
+                        : 0
+                    }}%
                   </p>
                 </div>
               </td>
@@ -126,24 +141,6 @@
 export default {
   name: "HomePage",
 
-  data() {
-    return {
-      imageInfo: {
-        name: "",
-        timestamp: "",
-      },
-      faceResultInfo: {
-        "viola-jones": {
-          percentage: "",
-        },
-        "hog-svn": {
-          percentage: "",
-        },
-      },
-      filters: [],
-    };
-  },
-
   created() {
     this.loadFilters();
     this.loadImages();
@@ -154,7 +151,8 @@ export default {
     selectedFilter: Object,
     currentGallery: Array,
     currentFilters: Array,
-    faceResult: Object,
+    currentAlgorithms: Array,
+    faceResult: Array,
   },
 
   methods: {
@@ -175,40 +173,25 @@ export default {
     applyFilter(image) {
       this.$emit("applyFilter", image);
     },
+
     runFaceDetection(image) {
-      this.$emit("getFace", image);
+      if (this.currentAlgorithms == null || this.currentAlgorithms.length <= 0) {
+        this.$emit("loadAlgorithms", image);
+      }
+      this.$emit("runFaceDetection", image);
+    },
+
+    getFaceImage(name) {
+      if (this.faceResult == null || this.faceResult.length <= 0) {
+        return "";
+      }
+      return this.faceResult.find((obj) => obj.name === name);
     },
   },
 
   computed: {
     galleryImageNum() {
       return this.currentGallery.length;
-    },
-  },
-
-  watch: {
-    selectedImage: function () {
-      const timestamp =
-        this.selectedImage.timestamp > 0
-          ? new Date(this.selectedImage.timestamp * 1000).toLocaleString("de-DE", {
-              hour12: false,
-            })
-          : "";
-      this.imageInfo = {
-        name: `Name: ${this.selectedImage.name}`,
-        timestamp: `Timestamp: ${timestamp}`,
-      };
-    },
-    currentFilters: function () {
-      this.filters = this.currentFilters;
-    },
-    faceResult: {
-      handler: function () {
-        Object.keys(this.faceResult).forEach((key) => {
-          this.faceResultInfo[key].percentage = this.faceResult[key].percentage + "%";
-        });
-      },
-      deep: true,
     },
   },
 };
@@ -257,7 +240,7 @@ export default {
 }
 
 .basicButton {
-  background-color: rgb(226, 215, 215);
+  background-color: rgb(204, 203, 205);
   padding: 0px 4px 0px 4px;
   margin-right: 5px;
   border-radius: 3px;
@@ -265,7 +248,7 @@ export default {
 }
 
 .basicDropdown {
-  background-color: rgb(226, 215, 215) !important;
+  background-color: rgb(165, 164, 168) !important;
   padding: 0px 4px 0px 4px;
   margin-right: 5px;
   border-radius: 3px;
