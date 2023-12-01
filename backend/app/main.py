@@ -1,12 +1,14 @@
 import os
 import ssl
 import dlib
+import base64
 import urllib.request
 
 from fastapi import FastAPI, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from PIL import Image, ImageFilter
+from pydantic import BaseModel
 from pathlib import Path
 from io import BytesIO
 import cv2
@@ -50,24 +52,50 @@ async def get_images():
         image_data_list.append(image_data)
     return JSONResponse(content=image_data_list)
 
+@app.get('/get-filters')
+async def get_filters():
+    response = [
+        {
+            'name': 'blur',
+            'displayName': 'Blur'
+        },
+        {
+            'name': 'horizontalEdge',
+            'displayName': 'Horizontal Edges'
+        },
+        {
+            'name': 'verticalEdge',
+            'displayName': 'Vertical Edges'
+        }
+    ]
+    return JSONResponse(content=response)
 
-@app.get('/get-img/{img_name}')
-async def get_img(img_name: str):
-    return FileResponse(IMAGE_PATH / img_name)
+def get_image_data(img_path):
+    with open(img_path, 'rb') as image_file:
+        base64_encoded = base64.b64encode(image_file.read()).decode("utf-8")
+    return {
+        'name': img_path.name,
+        'timestamp': os.path.getmtime(img_path),
+        'base64': f'data:image/png;base64,{base64_encoded}'
+        }
 
+class FilterRequestData(BaseModel):
+    filter: str
+    base64: str
 
-@app.get('/get-img-data/{img_name}')
-async def get_img_data(img_name: str):
-    return JSONResponse(content=get_image_data(IMAGE_PATH / img_name))
-
-
-@app.get('/get-blur/{img_name}')
-async def get_blur(img_name: str):
-    img = Image.open(IMAGE_PATH / img_name)
-    img = apply_blur(img)
+@app.post('/apply-filter')
+async def apply_filter(data: FilterRequestData):
+    img = Image.open(BytesIO(base64.b64decode(data.base64[22:])))
+    match data.filter:
+        case 'blur':
+            img = apply_blur(img)
+        case 'horizontalEdge':
+            img = apply_vertical_edge(img)
+        case 'verticalEdge':
+            img = apply_horizontal_edge(img)
     img_bytes_io = BytesIO()
     img.save(img_bytes_io, format='JPEG')
-    return StreamingResponse(BytesIO(img_bytes_io.getvalue()))
+    return JSONResponse(content={'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}'})
 
 
 @app.get('/get-face-data/{img_name}')
@@ -104,12 +132,7 @@ async def get_face_hog_svn(img_name: str):
     return StreamingResponse(BytesIO(img_bytes_io.getvalue()))
 
 
-def get_image_data(img_path):
-    return {
-        'name': img_path.name,
-        'timestamp': os.path.getmtime(img_path),
-        'url': f'get-img/{img_path.name}',
-    }
+
 
 
 # Opens the image from the given path and applies a box blur effect.
