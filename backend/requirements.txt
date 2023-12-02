@@ -6,3 +6,4 @@ Pillow>=6.1.0
 opencv-python>=4.8.1.78
 numpy>=1.26.2
 dlib>=19.24.2
+mtcnn>=0.1.1

@@ -6,7 +6,7 @@ import cv2
 import numpy
 import numpy as np
 import dlib
-from PIL import Image as PILImage
+from PIL import Image as PILImage, Image
 from matplotlib import pyplot as plt
 from mtcnn.mtcnn import MTCNN
 
@@ -122,23 +122,50 @@ def apply_medicine_mask(image: PILImage.Image, box_and_keypoints_list: list[tupl
     plt.show()
 
 
-pilImage = PILImage.open('../images/politician.jpg')
-box_and_keypoints_list = find_faces_with_mtcnn(np.array(pilImage))
-apply_medicine_mask(pilImage, box_and_keypoints_list)
-apply_sunglasses(pilImage, box_and_keypoints_list)
-# apply_sunglasses(PILImage.open('../images/olaf.jpg'))
-# apply_sunglasses(PILImage.open('../images/politician.jpg'))
-
-
-img = cv2.cvtColor(numpy.array(pilImage), cv2.COLOR_RGB2BGR)
-detector = dlib.get_frontal_face_detector()
-faces = detector(img)
-for face in faces:
-    x, y, w, h = face.left(), face.top(), face.width(), face.height()
-    cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 6)
-img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-plt.imshow(img_rgb)
-plt.show()
+# pilImage = PILImage.open('../images/politician.jpg')
+# box_and_keypoints_list = find_faces_with_mtcnn(np.array(pilImage))
+# apply_medicine_mask(pilImage, box_and_keypoints_list)
+# apply_sunglasses(pilImage, box_and_keypoints_list)
+# # apply_sunglasses(PILImage.open('../images/olaf.jpg'))
+# # apply_sunglasses(PILImage.open('../images/politician.jpg'))
+#
+#
+# img = cv2.cvtColor(numpy.array(pilImage), cv2.COLOR_RGB2BGR)
+# detector = dlib.get_frontal_face_detector()
+# faces = detector(img)
+# for face in faces:
+#     x, y, w, h = face.left(), face.top(), face.width(), face.height()
+#     cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 6)
+# img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+# plt.imshow(img_rgb)
+# plt.show()
 
 # plt.imshow(pilImage)
 # plt.show()
+
+ssd_detector = cv2.dnn.readNetFromCaffe("../backend/resources/deploy.prototxt",
+                                        "../backend/resources/res10_300x300_ssd_iter_140000.caffemodel")
+
+
+def highlight_face_ssd(img: Image):
+    img = cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
+    resized_rgb_image = cv2.resize(img, (300, 300))
+    imageBlob = cv2.dnn.blobFromImage(image=resized_rgb_image)
+    ssd_detector.setInput(imageBlob)
+    detections = ssd_detector.forward()
+
+    # only show detections over 80% certainty
+    for row in detections[0][0]:
+        if row[2] > 0.80:
+            x1, y1, x2, y2 = int(row[3] * img.shape[1]), int(row[4] * img.shape[0]), int(row[5] * img.shape[1]), int(row[6] * img.shape[0])
+            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 6)
+
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(img_rgb), False, 50
+
+
+pilImage = PILImage.open('../images/politician.jpg')
+pilImage, has_face, conf = highlight_face_ssd(pilImage)
+
+plt.imshow(pilImage)
+plt.show()
