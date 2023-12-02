@@ -148,6 +148,7 @@ export default {
 
   props: {
     selectedImage: Object,
+    selectedImageBoxAndKeypoints: Array,
     selectedFilter: Object,
     currentGallery: Array,
     currentFilters: Array,

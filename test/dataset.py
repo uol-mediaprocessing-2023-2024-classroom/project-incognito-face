@@ -34,7 +34,7 @@ def find_faces_with_mtcnn(image: np.ndarray) -> list[tuple[list, dict]]:
 
 
 def apply_sunglasses(image: PILImage.Image, box_and_keypoints_list: list[tuple[list, dict]], scale_factor: float = 2.5):
-    foreground = PILImage.open('../images/sunglasses.png')
+    foreground = PILImage.open('../backend/filters/sunglasses.png')
 
     for (box, keypoints) in box_and_keypoints_list:
         left_eye = keypoints['left_eye']
@@ -63,7 +63,7 @@ def apply_sunglasses(image: PILImage.Image, box_and_keypoints_list: list[tuple[l
 
 # das ist nur zum spielen
 def apply_whole_face_mask(image: PILImage.Image, box_and_keypoints_list: list[tuple[list, dict]]):
-    foreground = PILImage.open('../images/whole_face_mask.png').convert("RGBA")
+    foreground = PILImage.open('../backend/filters/whole_face_mask.png').convert("RGBA")
 
     for (box, keypoints) in box_and_keypoints_list:
         left_eye = keypoints['left_eye']
@@ -88,7 +88,7 @@ def apply_whole_face_mask(image: PILImage.Image, box_and_keypoints_list: list[tu
 
 
 def apply_medicine_mask(image: PILImage.Image, box_and_keypoints_list: list[tuple[list, dict]]):
-    foreground = PILImage.open('../images/medicine_mask.png')
+    foreground = PILImage.open('../backend/filters/medicine_mask.png')
     numpyArr = numpy.asarray(image)
 
     for (box, keypoints) in box_and_keypoints_list:

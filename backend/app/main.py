@@ -1,4 +1,5 @@
 import io
+import math
 import os
 import ssl
 from contextlib import redirect_stdout
@@ -56,6 +57,18 @@ FILTERS = [
     {
         'name': 'verticalEdge',
         'displayName': 'Vertical Edges'
+    },
+    {
+        'name': 'sunglasses',
+        'displayName': 'Sunglasses'
+    },
+    {
+        'name': 'faceMask',
+        'displayName': 'Face Mask'
+    },
+    {
+        'name': 'medicineMask',
+        'displayName': 'Medicine Mask'
     }
 ]
 
@@ -89,6 +102,7 @@ def home():
 async def get_images():
     image_data_list = []
     image_files = list(IMAGE_PATH.glob('*.jpg'))
+    # TODO: Add png images
     for img_path in image_files:
         image_data = get_image_data(img_path)
         image_data_list.append(image_data)
@@ -130,6 +144,12 @@ async def apply_filter(data: FilterRequestData):
             img = apply_vertical_edge(img)
         case 'verticalEdge':
             img = apply_horizontal_edge(img)
+        case 'sunglasses':
+            img = apply_sunglasses(img)
+        case 'faceMask':
+            img = apply_whole_face_mask(img)
+        case 'medicineMask':
+            img = apply_medicine_mask(img)
     img_bytes_io = BytesIO()
     img.save(img_bytes_io, format='JPEG')
     return JSONResponse(
@@ -152,6 +172,27 @@ async def get_face_data(data: RunFaceDetectionRequestData):
             except Exception as e:
                 print(f'An error occurred while trying to run multi-threaded face detection: {e}')
     return JSONResponse(content=result)
+
+
+class GetBoxAndKeypointsRequestData(BaseModel):
+    base64: str
+
+
+# TODO: Doesnt work - Daten sollten entweder auf dem Server gespeichert werden oder sie müssen bei jedem Filter immer wieder zum Server geschickt werden
+@app.post('/get-box-and-keypoints')
+async def get_box_and_keypoints(data: GetBoxAndKeypointsRequestData) -> list[tuple[list, dict]]:
+    detector = MTCNN()
+
+    # Disable printing
+    with io.StringIO() as dummy_stdout:
+        with redirect_stdout(dummy_stdout):
+            detected_faces = detector.detect_faces(data.base64)
+
+    box_and_keypoints_list = []
+    for face in detected_faces:
+        box_and_keypoints_list.append((face['box'], face['keypoints']))
+
+    return JSONResponse(content=box_and_keypoints_list)
 
 
 def process_algorithm(algorithm, img):
@@ -177,6 +218,21 @@ def process_algorithm(algorithm, img):
     }
 
 
+def find_faces_with_mtcnn(image: numpy.ndarray) -> list[tuple[list, dict]]:
+    detector = MTCNN()
+
+    # Disable printing
+    with io.StringIO() as dummy_stdout:
+        with redirect_stdout(dummy_stdout):
+            detected_faces = detector.detect_faces(image)
+
+    box_and_keypoints_list = []
+    for face in detected_faces:
+        box_and_keypoints_list.append((face['box'], face['keypoints']))
+
+    return box_and_keypoints_list
+
+
 # Opens the image from the given path and applies a box blur effect.
 def apply_blur(img: Image):
     img = img.filter(ImageFilter.BoxBlur(10))
@@ -195,6 +251,100 @@ def apply_horizontal_edge(img: Image):
 
 def apply_max_filter(img: Image):
     img = img.filter(ImageFilter.MaxFilter(3))
+    return img
+
+
+def apply_sunglasses(img: Image, scale_factor: float = 2.5):
+    foreground = Image.open('filters/sunglasses.png')
+
+    # TODO: Calculate list when loading the selectedImage
+    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(img))
+
+    for (box, keypoints) in box_and_keypoints_list:
+        left_eye = keypoints['left_eye']
+        right_eye = keypoints['right_eye']
+        dx = right_eye[0] - left_eye[0]
+        dy = right_eye[1] - left_eye[1]
+        angle_radians = math.atan2(-dy, dx)
+        angle_degrees = math.degrees(angle_radians)
+        eye_distance = math.dist((right_eye[0], right_eye[1]), (left_eye[0], left_eye[1]))
+
+        foreground_width_to_height_ratio = foreground.size[0] / foreground.size[1]
+        foreground = foreground.resize(size=(
+            int(scale_factor * eye_distance), int(scale_factor * eye_distance / foreground_width_to_height_ratio)))
+
+        rotated_overlay = foreground.rotate(angle_degrees, expand=True)
+
+        left_part = (scale_factor - 1) / 2
+        left_upper_sunglasses = (int(left_eye[0] - eye_distance * left_part),
+                                 int(left_eye[1] - eye_distance * left_part / foreground_width_to_height_ratio))
+
+        left_upper_paste = (left_upper_sunglasses[0], int(left_upper_sunglasses[1] - math.fabs(
+            math.cos(math.radians(90 - angle_degrees)) * scale_factor * eye_distance)))
+
+        img.paste(rotated_overlay, left_upper_paste, rotated_overlay)
+
+    return img
+
+
+# TODO: Change Position and scale of mask
+def apply_whole_face_mask(img: Image):
+    foreground = Image.open('filters/whole_face_mask.png').convert("RGBA")
+
+    # TODO: Calculate list when loading the selectedImage
+    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(img))
+
+    for (box, keypoints) in box_and_keypoints_list:
+        left_eye = keypoints['left_eye']
+        right_eye = keypoints['right_eye']
+        dx = right_eye[0] - left_eye[0]
+        dy = right_eye[1] - left_eye[1]
+        angle_radians = math.atan2(-dy, dx)
+        angle_degrees = math.degrees(angle_radians)
+        face_width = box[2]
+
+        foreground_width_to_height_ratio = foreground.size[0] / foreground.size[1]
+        foreground = foreground.resize(size=(face_width, int(face_width / foreground_width_to_height_ratio)))
+
+        rotated_overlay = foreground.rotate(angle_degrees, expand=True)
+
+        left_upper_face_mask = (box[0], box[1])
+
+        left_upper_paste = (left_upper_face_mask[0], int(left_upper_face_mask[1] - math.fabs(
+            math.cos(math.radians(90 - angle_degrees)) * face_width)))
+
+        img.paste(rotated_overlay, left_upper_paste, rotated_overlay)
+
+    return img
+
+
+def apply_medicine_mask(img: Image):
+    foreground = Image.open('filters/medicine_mask.png')
+
+    # TODO: Calculate list when loading the selectedImage
+    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(img))
+
+    for (box, keypoints) in box_and_keypoints_list:
+        left_mouth = keypoints['mouth_left']
+        right_mouth = keypoints['mouth_right']
+        dx = right_mouth[0] - left_mouth[0]
+        dy = right_mouth[1] - left_mouth[1]
+        angle_radians = math.atan2(-dy, dx)
+        angle_degrees = math.degrees(angle_radians)
+        face_width = box[2]
+
+        foreground_width_to_height_ratio = foreground.size[0] / foreground.size[1]
+        foreground = foreground.resize(size=(face_width, int(face_width / foreground_width_to_height_ratio)))
+
+        rotated_overlay = foreground.rotate(angle_degrees, expand=True)
+
+        left_upper_face_mask = (box[0], keypoints['nose'][1])
+
+        left_upper_paste = (left_upper_face_mask[0], int(left_upper_face_mask[1] - math.fabs(
+            math.cos(math.radians(90 - angle_degrees)) * face_width)))
+
+        img.paste(rotated_overlay, left_upper_paste, rotated_overlay)
+
     return img
 
 
@@ -298,9 +448,11 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={'message': 'An unexpected error occurred.'},
     )
 
+
 # Load detectors
 viola_jones_detector = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 hog_svm_detector = dlib.get_frontal_face_detector()
 cnn_detector = dlib.cnn_face_detection_model_v1("resources/mmod_human_face_detector.dat")
 mtcnn_detector = MTCNN()
-ssd_detector = cv2.dnn.readNetFromCaffe("resources/deploy.prototxt", "resources/res10_300x300_ssd_iter_140000.caffemodel")
+ssd_detector = cv2.dnn.readNetFromCaffe("resources/deploy.prototxt",
+                                        "resources/res10_300x300_ssd_iter_140000.caffemodel")

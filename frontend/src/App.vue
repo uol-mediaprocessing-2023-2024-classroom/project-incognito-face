@@ -3,6 +3,7 @@
     <v-main>
       <HomePage
         :selectedImage="selectedImage"
+        :selectedImageBoxAndKeypoints="selectedImageBoxAndKeypoints"
         :selectedFilter="selectedFilter"
         :currentGallery="currentGallery"
         :currentFilters="currentFilters"
@@ -34,6 +35,7 @@ export default {
   data() {
     return {
       selectedImage: null,
+      selectedImageBoxAndKeypoints: [],
       selectedFilter: null,
       currentGallery: [],
       currentFilters: [],
@@ -68,6 +70,18 @@ export default {
     async selectImage(image) {
       // Deepcopy to keep the gallery intact
       this.selectedImage = JSON.parse(JSON.stringify(image));
+
+      //const requestBody = {
+      //  base64: image.base64,
+      //};
+      //const response = await fetch("http://127.0.0.1:8000/get-box-and-keypoints", {
+      //  method: "POST",
+      //  headers: {
+      //    "Content-Type": "application/json",
+      //  },
+      //  body: JSON.stringify(requestBody),
+      //});
+      //this.selectedImageBoxAndKeypoints = await response.json();
     },
 
     async selectFilter(filter) {
