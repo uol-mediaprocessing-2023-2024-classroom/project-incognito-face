@@ -19,6 +19,7 @@ from pathlib import Path
 from io import BytesIO
 import cv2
 import numpy
+from matplotlib import pyplot as plt
 
 app = FastAPI()
 IMAGE_PATH = Path(__file__).parent.parent.parent / 'images'
@@ -69,6 +70,14 @@ FILTERS = [
     {
         'name': 'medicineMask',
         'displayName': 'Medicine Mask'
+    },
+    {
+        'name': 'cowFace',
+        'displayName': 'Cow Face'
+    },
+    {
+        'name': 'saltNPepper',
+        'displayName': 'Salt and Pepper'
     }
 ]
 
@@ -150,6 +159,11 @@ async def apply_filter(data: FilterRequestData):
             img = apply_whole_face_mask(img)
         case 'medicineMask':
             img = apply_medicine_mask(img)
+        case 'cowFace':
+            img = apply_cow_pattern(img)
+        case 'saltNPepper':
+            img = apply_salt_n_pepper(img)
+
     img_bytes_io = BytesIO()
     img.save(img_bytes_io, format='JPEG')
     return JSONResponse(
@@ -219,12 +233,10 @@ def process_algorithm(algorithm, img):
 
 
 def find_faces_with_mtcnn(image: numpy.ndarray) -> list[tuple[list, dict]]:
-    detector = MTCNN()
-
     # Disable printing
-    with io.StringIO() as dummy_stdout:
+    with (io.StringIO() as dummy_stdout):
         with redirect_stdout(dummy_stdout):
-            detected_faces = detector.detect_faces(image)
+            detected_faces = mtcnn_detector.detect_faces(image)
 
     box_and_keypoints_list = []
     for face in detected_faces:
@@ -348,6 +360,44 @@ def apply_medicine_mask(img: Image):
     return img
 
 
+def apply_cow_pattern(image: Image, alpha_of_cow_pattern: int = 85):
+    foreground = Image.open('../backend/filters/cow_pattern.png')
+    foreground.putalpha(alpha_of_cow_pattern)
+
+    # TODO: Calculate list when loading the selectedImage
+    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(image))
+
+    for (box, keypoints) in box_and_keypoints_list:
+        box_upper_left_x = box[0]
+        box_upper_left_y = box[1]
+        box_width = box[2]
+        box_height = box[3]
+        resized_foreground = foreground.resize((box_width, box_height), resample=Image.LANCZOS)
+        image.paste(resized_foreground, (box_upper_left_x, box_upper_left_y), resized_foreground)
+
+    return image
+
+
+def apply_salt_n_pepper(image: Image, alpha_of_salt_n_pepper: int = 90):
+    # TODO: Calculate list when loading the selectedImage
+    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(image))
+
+    for (box, keypoints) in box_and_keypoints_list:
+        box_upper_left_x = box[0]
+        box_upper_left_y = box[1]
+        box_width = box[2]
+        box_height = box[3]
+        pixels = numpy.zeros(box_width * box_height, dtype=numpy.uint8)
+        pixels[:box_width * box_height // 2] = 255  # Set first half to white (value 255)
+        numpy.random.shuffle(pixels)
+        rgb_box = numpy.stack((pixels, pixels, pixels), axis=-1)
+        rgb_box_reshaped = numpy.reshape(rgb_box, (box_height, box_width, 3))
+        pixels_with_alpha = Image.fromarray(rgb_box_reshaped)
+        pixels_with_alpha.putalpha(alpha_of_salt_n_pepper)
+        image.paste(pixels_with_alpha, (box_upper_left_x, box_upper_left_y), pixels_with_alpha)
+
+    return image
+
 def highlight_face_viola_jones(img: Image):
     img = cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
     gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -380,7 +430,7 @@ def highlight_face_hog_svm(img: Image):
 
 
 def highlight_face_cnn(img: Image):
-    img = cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
+    img = numpy.array(img)
     faces = cnn_detector(img)
 
     detected_a_face = False
@@ -392,13 +442,11 @@ def highlight_face_cnn(img: Image):
         x, y, w, h = face.rect.left(), face.rect.top(), face.rect.width(), face.rect.height()
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 6)
 
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(img_rgb), detected_a_face, confidence
+    return Image.fromarray(img), detected_a_face, confidence
 
 
 def highlight_face_mtcnn(img: Image):
-    img = cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
-
+    img = numpy.array(img)
     # Disable printing
     with io.StringIO() as dummy_stdout:
         with redirect_stdout(dummy_stdout):
@@ -413,8 +461,7 @@ def highlight_face_mtcnn(img: Image):
         x, y, w, h = face['box'][0], face['box'][1], face['box'][2], face['box'][3]
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 6)
 
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(img_rgb), detected_a_face, confidence
+    return Image.fromarray(img), detected_a_face, confidence
 
 
 def highlight_face_ssd(img: Image):
