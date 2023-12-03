@@ -9,6 +9,7 @@ from sklearn import datasets
 from matplotlib import pyplot as plt
 import ImageModification as imod
 from mtcnn.mtcnn import MTCNN
+from PIL import Image as PILImage, Image
 
 
 def get_faces():
@@ -45,6 +46,8 @@ def count_detected_faces_hog(image_mod_fn: Callable[[np.ndarray], np.ndarray]):
         scaled_rgb_image = (possibleFace * 255).astype(np.uint8)
 
         modifiedImage = image_mod_fn(scaled_rgb_image)
+        plt.imshow(modifiedImage)
+        plt.show()
 
         detected_faces = detector(modifiedImage)
 
@@ -158,12 +161,24 @@ def image_modification_plot(count_detected_faces: Callable[[Callable[[np.ndarray
     plt.show()
 
 
+# def add_cow_pattern(image: PILImage.Image):
+#         image = Image.fromarray(image)
+#         foreground = PILImage.open('../backend/filters/cow_pattern.png')
+#         foreground.putalpha(50)
+#         box_upper_left_x = 0
+#         box_upper_left_y = 0
+#         box_width = image.width
+#         box_height = image.height
+#         resized_foreground = foreground.resize((box_width, box_height), resample=Image.LANCZOS)
+#         image.paste(resized_foreground, (box_upper_left_x, box_upper_left_y), resized_foreground)
+#         return np.array(image)
+
 # image_modification_plot(count_detected_faces_hog, 'HOG modifications')
 
 # count_detected_faces_haar(imod.blur_edges)
 # count_detected_faces_hog(imod.blur_edges)
 
-image_modification_plot(count_detected_faces_cnn, 'CNN modifications')
+# count_detected_faces_hog(add_cow_pattern)
 
 # image_modification_plot(count_detected_faces_ssd, 'SSD modifications')
 
