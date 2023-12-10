@@ -1,6 +1,9 @@
 import io
 import math
+import random
+import sys
 from contextlib import redirect_stdout
+from typing import Tuple, List
 
 import cv2
 import numpy
@@ -122,6 +125,77 @@ def apply_medicine_mask(image: PILImage.Image, box_and_keypoints_list: list[tupl
     plt.show()
 
 
+def apply_face_masks_not_on_face(img: PILImage.Image, number_of_masks: int, face_mask_width: int, face_mask_height: int,
+                                 box_and_keypoints_list: list[tuple[list, dict]], alpha_of_masks: int = 0):
+    # Apply alpha to foreground (image must have transparent background so that this works)
+    foreground = PILImage.open('../backend/filters/whole_face_mask.png').convert('RGBA')
+    foreground_alpha = apply_alpha_to_transparent_image(foreground, alpha_of_masks)
+
+    # find coordinates of faces on image
+    face_and_mask_coordinates = find_face_rectangles_mtcnn(box_and_keypoints_list)
+
+    # find free coordinates for mask
+    mask_cords = find_free_coordinates_outside_of_squares(img, number_of_masks, face_mask_width, face_mask_height, face_and_mask_coordinates)
+
+    # insert masks on image
+    for mask_coords in mask_cords:
+        resized_foreground = foreground_alpha.resize((face_mask_width, face_mask_height), resample=Image.LANCZOS)
+        img.paste(resized_foreground, (mask_coords[0], mask_coords[1]), resized_foreground)
+
+    return img
+
+
+def apply_alpha_to_transparent_image(foreground: Image, alpha_of_masks: int) -> Image:
+    foreground_copy = foreground.copy()
+    foreground_copy.putalpha(alpha_of_masks)
+    foreground.paste(foreground_copy, mask=foreground)
+    return foreground
+
+
+def find_face_rectangles_mtcnn(box_and_keypoints_list: list[tuple[list, dict]]) -> list[tuple[int, int, int, int]]:
+    face_coordinates = []
+    for (box, keypoints) in box_and_keypoints_list:
+        box_upper_left_x = box[0]
+        box_upper_left_y = box[1]
+        box_width = box[2]
+        box_height = box[3]
+        face_coordinates.append(
+            (box_upper_left_x, box_upper_left_y, box_width, box_height))
+    return face_coordinates
+
+
+def find_free_coordinates_outside_of_squares(img: Image, number_of_inserted_items: int, width_of_inserted_item: int,
+                                             height_of_inserted_item: int, taken_coordinates=None, search_limit_per_try: int = sys.maxsize) -> list[tuple[int, int]]:
+    if taken_coordinates is None:
+        taken_coordinates = []
+
+    width, height = img.size
+    inserted_items = 0
+    inserted_items_coords = []
+    unsuccessful_tries = 0
+    while inserted_items < number_of_inserted_items:
+        if unsuccessful_tries >= search_limit_per_try:
+            raise Exception("Too many insertion tries")
+
+        item_x = random.randint(0, width - 1)
+        item_y = random.randint(0, height - 1)
+        inserted = True
+        for coordinates in taken_coordinates:
+            is_outside_of_square = (item_x + width_of_inserted_item < coordinates[0]
+                                    or item_x > coordinates[0] + coordinates[2]
+                                    or item_y > coordinates[1] + coordinates[3]
+                                    or item_y + height_of_inserted_item < coordinates[1])
+            if not is_outside_of_square:
+                inserted = False
+                break
+        if not inserted:
+            unsuccessful_tries += 1
+            continue
+        inserted_items += 1
+        inserted_items_coords.append((item_x, item_y))
+        taken_coordinates.append((item_x, item_y, width_of_inserted_item, height_of_inserted_item))
+    return inserted_items_coords
+
 # pilImage = PILImage.open('../images/politician.jpg')
 # box_and_keypoints_list = find_faces_with_mtcnn(np.array(pilImage))
 # apply_medicine_mask(pilImage, box_and_keypoints_list)
@@ -142,6 +216,26 @@ def apply_medicine_mask(image: PILImage.Image, box_and_keypoints_list: list[tupl
 
 # plt.imshow(pilImage)
 # plt.show()
+
+### HOG
+pilImage = PILImage.open('../images/politician.jpg')
+result = find_faces_with_mtcnn(np.array(pilImage))
+detector = dlib.get_frontal_face_detector()  # hog detector
+# # detector = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+temp = apply_face_masks_not_on_face(pilImage, 10, 100, 100, result, 45)
+# # temp.save("../images/test2.jpg")
+temp_np = np.array(temp)
+# # img = cv2.cvtColor(numpy.array(temp_np), cv2.COLOR_RGB2BGR)
+# # gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+detected_faces = detector(temp_np)
+for face in detected_faces:
+    detected_a_face = True
+    x, y, w, h = face.left(), face.top(), face.width(), face.height()
+    cv2.rectangle(temp_np, (x, y), (x + w, y + h), (255, 0, 0), 6)
+# # # img_rgb = cv2.cvtColor(gray_image, cv2.COLOR_BGR2RGB)
+plt.imshow(temp_np)
+plt.show()
+print(len(detected_faces))
 
 ssd_detector = cv2.dnn.readNetFromCaffe("../backend/resources/deploy.prototxt",
                                         "../backend/resources/res10_300x300_ssd_iter_140000.caffemodel")
@@ -164,8 +258,8 @@ def highlight_face_ssd(img: Image):
     return Image.fromarray(img_rgb), False, 50
 
 
-pilImage = PILImage.open('../images/politician.jpg')
-pilImage, has_face, conf = highlight_face_ssd(pilImage)
-
-plt.imshow(pilImage)
-plt.show()
+# pilImage = PILImage.open('../images/politician.jpg')
+# pilImage, has_face, conf = highlight_face_ssd(pilImage)
+#
+# plt.imshow(pilImage)
+# plt.show()
