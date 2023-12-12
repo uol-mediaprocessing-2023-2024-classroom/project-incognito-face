@@ -5,7 +5,11 @@ import ssl
 from contextlib import redirect_stdout
 
 import dlib
+import time
+import json
 import base64
+import hashlib
+import threading
 import urllib.request
 import concurrent.futures
 
@@ -23,6 +27,7 @@ from matplotlib import pyplot as plt
 
 app = FastAPI()
 IMAGE_PATH = Path(__file__).parent.parent.parent / 'images'
+CACHE_FILE = IMAGE_PATH / 'cache.json'
 FACE_DETECTION_ALGORITHMS = [
     {
         'name': 'viola-jones',
@@ -81,7 +86,17 @@ FILTERS = [
     }
 ]
 
-# SSL configuration for HTTPS requests
+cache = {}
+running_threads = {}
+lock = threading.Lock() 
+
+if os.path.isfile(CACHE_FILE):
+    try:
+        with open(CACHE_FILE, 'r') as file:
+            cache = json.load(file)
+            print(f'Loaded cache from {CACHE_FILE}')
+    except: pass
+
 ssl._create_default_https_context = ssl._create_unverified_context
 
 # CORS configuration: specify the origins that are allowed to make cross-site requests
@@ -146,6 +161,7 @@ class FilterRequestData(BaseModel):
 @app.post('/apply-filter')
 async def apply_filter(data: FilterRequestData):
     img = Image.open(BytesIO(base64.b64decode(data.base64[22:])))
+    get_box_and_keypoints(img, False) # Preload Cache, without blocking
     match data.filter:
         case 'blur':
             img = apply_blur(img)
@@ -175,7 +191,7 @@ class RunFaceDetectionRequestData(BaseModel):
 
 
 @app.post('/run-face-detection')
-async def get_face_data(data: RunFaceDetectionRequestData):
+async def run_face_detection(data: RunFaceDetectionRequestData):
     result = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [executor.submit(process_algorithm, algorithm, data.base64) for algorithm in
@@ -188,25 +204,60 @@ async def get_face_data(data: RunFaceDetectionRequestData):
     return JSONResponse(content=result)
 
 
-class GetBoxAndKeypointsRequestData(BaseModel):
+class GetFaceInformationData(BaseModel):
     base64: str
 
 
-# TODO: Doesnt work - Daten sollten entweder auf dem Server gespeichert werden oder sie müssen bei jedem Filter immer wieder zum Server geschickt werden
-@app.post('/get-box-and-keypoints')
-async def get_box_and_keypoints(data: GetBoxAndKeypointsRequestData) -> list[tuple[list, dict]]:
-    detector = MTCNN()
+@app.post('/get-face-information')
+async def get_face_information(data: GetFaceInformationData):
+    img_hash = hashlib.sha256(input_string.encode()).hexdigest()
+    image = Image.open(BytesIO(base64.b64decode(data.base64[22:])))
+    return JSONResponse(content=get_box_and_keypoints(img_hash, image))
 
-    # Disable printing
+
+def get_image_hash(image):
+    img_b64 = ""
+    if isinstance(image, str):
+        img_b64 = image[22:]
+    elif isinstance(image, Image.Image):
+        img_bytes_io = BytesIO()
+        image.save(img_bytes_io, format='JPEG')
+        img_b64 = base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")
+    else:
+        raise TypeError('Invalid image type')
+    return hashlib.sha256(img_b64.encode()).hexdigest()
+
+
+def get_box_and_keypoints(image: Image, wait_for_result=False):
+    img_hash = get_image_hash(image)
+    thread = None 
+    with lock:
+        if img_hash in cache.keys():
+            return cache[img_hash]
+        if img_hash in running_threads.keys():
+            thread = running_threads[img_hash]
+        else:
+            thread = threading.Thread(target=threaded_keypoints, args=(img_hash, image))
+            thread.start()
+            running_threads[img_hash] = thread
+    if wait_for_result:
+        thread.join()
+        return cache[img_hash]
+
+
+def threaded_keypoints(img_hash: str, image: Image):
+    detector = MTCNN()
     with io.StringIO() as dummy_stdout:
         with redirect_stdout(dummy_stdout):
-            detected_faces = detector.detect_faces(data.base64)
-
+            detected_faces = detector.detect_faces(numpy.asarray(image))
     box_and_keypoints_list = []
     for face in detected_faces:
         box_and_keypoints_list.append((face['box'], face['keypoints']))
-
-    return JSONResponse(content=box_and_keypoints_list)
+    with lock:
+        cache[img_hash] = box_and_keypoints_list
+        del running_threads[img_hash]
+        with open(CACHE_FILE, 'w') as file:
+            json.dump(cache, file)
 
 
 def process_algorithm(algorithm, img):
@@ -232,45 +283,30 @@ def process_algorithm(algorithm, img):
     }
 
 
-def find_faces_with_mtcnn(image: numpy.ndarray) -> list[tuple[list, dict]]:
-    # Disable printing
-    with (io.StringIO() as dummy_stdout):
-        with redirect_stdout(dummy_stdout):
-            detected_faces = mtcnn_detector.detect_faces(image)
-
-    box_and_keypoints_list = []
-    for face in detected_faces:
-        box_and_keypoints_list.append((face['box'], face['keypoints']))
-
-    return box_and_keypoints_list
+def apply_blur(image: Image):
+    image = image.filter(ImageFilter.BoxBlur(10))
+    return image
 
 
-# Opens the image from the given path and applies a box blur effect.
-def apply_blur(img: Image):
-    img = img.filter(ImageFilter.BoxBlur(10))
-    return img
+def apply_vertical_edge(image: Image):
+    image = image.filter(ImageFilter.Kernel((3, 3), (-1, 0, 1, -2, 0, 2, -1, 0, 1), 1, 0))
+    return image
 
 
-def apply_vertical_edge(img: Image):
-    img = img.filter(ImageFilter.Kernel((3, 3), (-1, 0, 1, -2, 0, 2, -1, 0, 1), 1, 0))
-    return img
+def apply_horizontal_edge(image: Image):
+    image = image.filter(ImageFilter.Kernel((3, 3), (-1, -2, -1, 0, 0, 0, 1, 2, 1), 1, 0))
+    return image
 
 
-def apply_horizontal_edge(img: Image):
-    img = img.filter(ImageFilter.Kernel((3, 3), (-1, -2, -1, 0, 0, 0, 1, 2, 1), 1, 0))
-    return img
+def apply_max_filter(image: Image):
+    image = image.filter(ImageFilter.MaxFilter(3))
+    return image
 
 
-def apply_max_filter(img: Image):
-    img = img.filter(ImageFilter.MaxFilter(3))
-    return img
-
-
-def apply_sunglasses(img: Image, scale_factor: float = 2.5):
+def apply_sunglasses(image: Image, scale_factor: float = 2.5):
     foreground = Image.open('filters/sunglasses.png')
 
-    # TODO: Calculate list when loading the selectedImage
-    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(img))
+    box_and_keypoints_list = get_box_and_keypoints(image, True)
 
     for (box, keypoints) in box_and_keypoints_list:
         left_eye = keypoints['left_eye']
@@ -294,17 +330,16 @@ def apply_sunglasses(img: Image, scale_factor: float = 2.5):
         left_upper_paste = (left_upper_sunglasses[0], int(left_upper_sunglasses[1] - math.fabs(
             math.cos(math.radians(90 - angle_degrees)) * scale_factor * eye_distance)))
 
-        img.paste(rotated_overlay, left_upper_paste, rotated_overlay)
+        image.paste(rotated_overlay, left_upper_paste, rotated_overlay)
 
-    return img
+    return image
 
 
 # TODO: Change Position and scale of mask
-def apply_whole_face_mask(img: Image):
+def apply_whole_face_mask(image: Image):
     foreground = Image.open('filters/whole_face_mask.png').convert("RGBA")
 
-    # TODO: Calculate list when loading the selectedImage
-    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(img))
+    box_and_keypoints_list = get_box_and_keypoints(image, True)
 
     for (box, keypoints) in box_and_keypoints_list:
         left_eye = keypoints['left_eye']
@@ -325,16 +360,15 @@ def apply_whole_face_mask(img: Image):
         left_upper_paste = (left_upper_face_mask[0], int(left_upper_face_mask[1] - math.fabs(
             math.cos(math.radians(90 - angle_degrees)) * face_width)))
 
-        img.paste(rotated_overlay, left_upper_paste, rotated_overlay)
+        image.paste(rotated_overlay, left_upper_paste, rotated_overlay)
 
-    return img
+    return image
 
 
-def apply_medicine_mask(img: Image):
-    foreground = Image.open('filters/medicine_mask.png')
+def apply_medicine_mask(image: Image):
+    foreground = Image.open('filters/medicine_mask.png').convert("RGBA")
 
-    # TODO: Calculate list when loading the selectedImage
-    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(img))
+    box_and_keypoints_list = get_box_and_keypoints(image, True)
 
     for (box, keypoints) in box_and_keypoints_list:
         left_mouth = keypoints['mouth_left']
@@ -355,17 +389,16 @@ def apply_medicine_mask(img: Image):
         left_upper_paste = (left_upper_face_mask[0], int(left_upper_face_mask[1] - math.fabs(
             math.cos(math.radians(90 - angle_degrees)) * face_width)))
 
-        img.paste(rotated_overlay, left_upper_paste, rotated_overlay)
+        image.paste(rotated_overlay, left_upper_paste, rotated_overlay)
 
-    return img
+    return image
 
 
 def apply_cow_pattern(image: Image, alpha_of_cow_pattern: int = 85):
-    foreground = Image.open('../backend/filters/cow_pattern.png')
+    foreground = Image.open('../backend/filters/cow_pattern.png').convert("RGBA")
     foreground.putalpha(alpha_of_cow_pattern)
 
-    # TODO: Calculate list when loading the selectedImage
-    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(image))
+    box_and_keypoints_list = get_box_and_keypoints(image, True)
 
     for (box, keypoints) in box_and_keypoints_list:
         box_upper_left_x = box[0]
@@ -375,12 +408,12 @@ def apply_cow_pattern(image: Image, alpha_of_cow_pattern: int = 85):
         resized_foreground = foreground.resize((box_width, box_height), resample=Image.LANCZOS)
         image.paste(resized_foreground, (box_upper_left_x, box_upper_left_y), resized_foreground)
 
+
     return image
 
 
 def apply_salt_n_pepper(image: Image, alpha_of_salt_n_pepper: int = 90):
-    # TODO: Calculate list when loading the selectedImage
-    box_and_keypoints_list = find_faces_with_mtcnn(numpy.asarray(image))
+    box_and_keypoints_list = get_box_and_keypoints(image, True)
 
     for (box, keypoints) in box_and_keypoints_list:
         box_upper_left_x = box[0]
@@ -423,7 +456,7 @@ def highlight_face_hog_svm(img: Image):
     for face in faces:
         detected_a_face = True
         x, y, w, h = face.left(), face.top(), face.width(), face.height()
-        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 6)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 0), 6)
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return Image.fromarray(img_rgb), detected_a_face, '?'
@@ -440,7 +473,7 @@ def highlight_face_cnn(img: Image):
         detected_a_face = True
         confidence = round(face.confidence * 100, 3)
         x, y, w, h = face.rect.left(), face.rect.top(), face.rect.width(), face.rect.height()
-        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 6)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 6)
 
     return Image.fromarray(img), detected_a_face, confidence
 
@@ -459,7 +492,7 @@ def highlight_face_mtcnn(img: Image):
         detected_a_face = True
         confidence = round(face['confidence'] * 100, 3)
         x, y, w, h = face['box'][0], face['box'][1], face['box'][2], face['box'][3]
-        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 6)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 255), 6)
 
     return Image.fromarray(img), detected_a_face, confidence
 
@@ -481,7 +514,7 @@ def highlight_face_ssd(img: Image):
             confidence = round(row[2] * 100, 3)
             x1, y1, x2, y2 = int(row[3] * img.shape[1]), int(row[4] * img.shape[0]), int(row[5] * img.shape[1]), int(
                 row[6] * img.shape[0])
-            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 6)
+            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 255), 6)
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return Image.fromarray(img_rgb), detected_a_face, confidence
