@@ -3,7 +3,6 @@
     <v-main>
       <HomePage
         :selectedImage="selectedImage"
-        :selectedImageBoxAndKeypoints="selectedImageBoxAndKeypoints"
         :selectedFilter="selectedFilter"
         :currentGallery="currentGallery"
         :currentFilters="currentFilters"
@@ -35,7 +34,6 @@ export default {
   data() {
     return {
       selectedImage: null,
-      selectedImageBoxAndKeypoints: [],
       selectedFilter: null,
       currentGallery: [],
       currentFilters: [],
@@ -44,6 +42,7 @@ export default {
       allImgData: [],
       limit: 60,
       loadedAmount: 0,
+      backendHost: "http://127.0.0.1:8000"
     };
   },
 
@@ -53,17 +52,17 @@ export default {
 
   methods: {
     async loadImages() {
-      const response = await fetch("http://127.0.0.1:8000/get-images");
+      const response = await fetch(this.backendHost + "/get-images");
       this.currentGallery = await response.json();
     },
 
     async loadFilters() {
-      const response = await fetch("http://127.0.0.1:8000/get-filters");
+      const response = await fetch(this.backendHost + "/get-filters");
       this.currentFilters = await response.json();
     },
 
     async loadAlgorithms() {
-      const response = await fetch("http://127.0.0.1:8000/get-algorithms");
+      const response = await fetch(this.backendHost + "/get-algorithms");
       this.currentAlgorithms = await response.json();
     },
 
@@ -71,17 +70,18 @@ export default {
       // Deepcopy to keep the gallery intact
       this.selectedImage = JSON.parse(JSON.stringify(image));
 
-      //const requestBody = {
-      //  base64: image.base64,
-      //};
-      //const response = await fetch("http://127.0.0.1:8000/get-box-and-keypoints", {
-      //  method: "POST",
-      //  headers: {
-      //    "Content-Type": "application/json",
-      //  },
-      //  body: JSON.stringify(requestBody),
-      //});
-      //this.selectedImageBoxAndKeypoints = await response.json();
+      const requestBody = {
+        base64: image.base64,
+        hash: image.hash
+      };
+      const response = await fetch("http://127.0.0.1:8000/generate-keypoints", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+      await response.json();
     },
 
     async selectFilter(filter) {
@@ -95,8 +95,9 @@ export default {
       const requestBody = {
         filter: this.selectedFilter.name,
         base64: image.base64,
+        hash: image.hash
       };
-      const response = await fetch("http://127.0.0.1:8000/apply-filter", {
+      const response = await fetch(this.backendHost + "/apply-filter", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -113,8 +114,9 @@ export default {
       }
       const requestBody = {
         base64: image.base64,
+        hash: image.hash
       };
-      const response = await fetch("http://127.0.0.1:8000/run-face-detection", {
+      const response = await fetch(this.backendHost + "/run-face-detection", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

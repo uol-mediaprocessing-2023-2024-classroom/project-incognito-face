@@ -39,16 +39,19 @@
             <div>
               <h3>Image Info:<br /></h3>
               <p>
-                {{ selectedImage ? selectedImage.name : "" }}
+                {{ selectedImage && selectedImage.name ? "Name: " + selectedImage.name : "" }}
               </p>
               <p>
                 {{
                   selectedImage && selectedImage.timestamp > 0
-                    ? new Date(
+                    ? "Date: " + new Date(
                         this.selectedImage.timestamp * 1000
                       ).toLocaleString("de-DE", { hour12: false })
                     : ""
                 }}
+              </p>
+              <p>
+                {{ selectedImage && selectedImage.hash ? "Hash: " + selectedImage.hash.slice(0, 16) + "..." : "" }}
               </p>
             </div>
           </div>
@@ -148,7 +151,6 @@ export default {
 
   props: {
     selectedImage: Object,
-    selectedImageBoxAndKeypoints: Array,
     selectedFilter: Object,
     currentGallery: Array,
     currentFilters: Array,

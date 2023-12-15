@@ -65,6 +65,18 @@ FILTERS = [
         'displayName': 'Vertical Edges'
     },
     {
+        'name': 'dithering',
+        'displayName': 'Floyd Steinberg'
+    },
+    {
+        'name': 'closing',
+        'displayName': 'Closing'
+    },
+        {
+        'name': 'opening',
+        'displayName': 'Opening'
+    },
+    {
         'name': 'sunglasses',
         'displayName': 'Sunglasses'
     },
@@ -136,10 +148,12 @@ async def get_images():
 def get_image_data(img_path):
     with open(img_path, 'rb') as image_file:
         base64_encoded = base64.b64encode(image_file.read()).decode("utf-8")
+    base64_encoded = f'data:image/png;base64,{base64_encoded}'
     return {
         'name': img_path.name,
         'timestamp': os.path.getmtime(img_path),
-        'base64': f'data:image/png;base64,{base64_encoded}'
+        'base64': base64_encoded,
+        'hash': get_image_hash(base64_encoded)
     }
 
 
@@ -156,12 +170,12 @@ async def get_algorithms():
 class FilterRequestData(BaseModel):
     filter: str
     base64: str
+    hash: str
 
 
 @app.post('/apply-filter')
 async def apply_filter(data: FilterRequestData):
     img = Image.open(BytesIO(base64.b64decode(data.base64[22:])))
-    get_box_and_keypoints(img, False) # Preload Cache, without blocking
     match data.filter:
         case 'blur':
             img = apply_blur(img)
@@ -169,16 +183,22 @@ async def apply_filter(data: FilterRequestData):
             img = apply_vertical_edge(img)
         case 'verticalEdge':
             img = apply_horizontal_edge(img)
+        case 'dithering':
+            img = apply_dithering(img)
+        case 'closing':
+            img = apply_closing(img)
+        case 'opening':
+            img = apply_opening(img)
         case 'sunglasses':
-            img = apply_sunglasses(img)
+            img = apply_sunglasses(img, get_keypoints(img, True, data.hash))
         case 'faceMask':
-            img = apply_whole_face_mask(img)
+            img = apply_whole_face_mask(img, get_keypoints(img, True, data.hash))
         case 'medicineMask':
-            img = apply_medicine_mask(img)
+            img = apply_medicine_mask(img), get_keypoints(img, True, data.hash)
         case 'cowFace':
-            img = apply_cow_pattern(img)
+            img = apply_cow_pattern(img, get_keypoints(img, True, data.hash))
         case 'saltNPepper':
-            img = apply_salt_n_pepper(img)
+            img = apply_salt_n_pepper(img, get_keypoints(img, True, data.hash))
 
     img_bytes_io = BytesIO()
     img.save(img_bytes_io, format='JPEG')
@@ -188,6 +208,7 @@ async def apply_filter(data: FilterRequestData):
 
 class RunFaceDetectionRequestData(BaseModel):
     base64: str
+    hash: str
 
 
 @app.post('/run-face-detection')
@@ -204,15 +225,16 @@ async def run_face_detection(data: RunFaceDetectionRequestData):
     return JSONResponse(content=result)
 
 
-class GetFaceInformationData(BaseModel):
+class GenerateKeypointsData(BaseModel):
     base64: str
+    hash: str
 
 
-@app.post('/get-face-information')
-async def get_face_information(data: GetFaceInformationData):
-    img_hash = hashlib.sha256(input_string.encode()).hexdigest()
+@app.post('/generate-keypoints')
+async def generate_keypoints(data: GenerateKeypointsData):
     image = Image.open(BytesIO(base64.b64decode(data.base64[22:])))
-    return JSONResponse(content=get_box_and_keypoints(img_hash, image))
+    get_keypoints(image, False, data.hash)
+    return JSONResponse(content={'message': 'Keypoint generation started'})
 
 
 def get_image_hash(image):
@@ -228,8 +250,9 @@ def get_image_hash(image):
     return hashlib.sha256(img_b64.encode()).hexdigest()
 
 
-def get_box_and_keypoints(image: Image, wait_for_result=False):
-    img_hash = get_image_hash(image)
+def get_keypoints(image: Image, wait_for_result=False, img_hash=None):
+    if img_hash is None:
+        img_hash = get_image_hash(image)
     thread = None 
     with lock:
         if img_hash in cache.keys():
@@ -298,17 +321,32 @@ def apply_horizontal_edge(image: Image):
     return image
 
 
+def apply_dithering(image: Image) -> Image:
+    return image.convert('RGB').quantize(colors=16, method=Image.FLOYDSTEINBERG).convert('RGB')
+
+
 def apply_max_filter(image: Image):
-    image = image.filter(ImageFilter.MaxFilter(3))
+    image = image.filter(ImageFilter.MaxFilter(9))
     return image
 
 
-def apply_sunglasses(image: Image, scale_factor: float = 2.5):
+def apply_min_filter(image: Image):
+    image = image.filter(ImageFilter.MinFilter(9))
+    return image
+
+
+def apply_closing(image: Image):
+    return apply_min_filter(apply_max_filter(image))
+
+
+def apply_opening(image: Image):
+    return apply_max_filter(apply_min_filter(image))
+
+
+def apply_sunglasses(image: Image, keypoints, scale_factor: float = 2.5):
     foreground = Image.open('filters/sunglasses.png')
 
-    box_and_keypoints_list = get_box_and_keypoints(image, True)
-
-    for (box, keypoints) in box_and_keypoints_list:
+    for (box, keypoints) in keypoints:
         left_eye = keypoints['left_eye']
         right_eye = keypoints['right_eye']
         dx = right_eye[0] - left_eye[0]
@@ -336,12 +374,10 @@ def apply_sunglasses(image: Image, scale_factor: float = 2.5):
 
 
 # TODO: Change Position and scale of mask
-def apply_whole_face_mask(image: Image):
+def apply_whole_face_mask(image: Image, keypoints):
     foreground = Image.open('filters/whole_face_mask.png').convert("RGBA")
 
-    box_and_keypoints_list = get_box_and_keypoints(image, True)
-
-    for (box, keypoints) in box_and_keypoints_list:
+    for (box, keypoints) in keypoints:
         left_eye = keypoints['left_eye']
         right_eye = keypoints['right_eye']
         dx = right_eye[0] - left_eye[0]
@@ -365,12 +401,10 @@ def apply_whole_face_mask(image: Image):
     return image
 
 
-def apply_medicine_mask(image: Image):
+def apply_medicine_mask(image: Image, keypoints):
     foreground = Image.open('filters/medicine_mask.png').convert("RGBA")
 
-    box_and_keypoints_list = get_box_and_keypoints(image, True)
-
-    for (box, keypoints) in box_and_keypoints_list:
+    for (box, keypoints) in keypoints:
         left_mouth = keypoints['mouth_left']
         right_mouth = keypoints['mouth_right']
         dx = right_mouth[0] - left_mouth[0]
@@ -394,13 +428,11 @@ def apply_medicine_mask(image: Image):
     return image
 
 
-def apply_cow_pattern(image: Image, alpha_of_cow_pattern: int = 85):
+def apply_cow_pattern(image: Image, keypoints, alpha_of_cow_pattern: int = 85):
     foreground = Image.open('../backend/filters/cow_pattern.png').convert("RGBA")
     foreground.putalpha(alpha_of_cow_pattern)
 
-    box_and_keypoints_list = get_box_and_keypoints(image, True)
-
-    for (box, keypoints) in box_and_keypoints_list:
+    for (box, keypoints) in keypoints:
         box_upper_left_x = box[0]
         box_upper_left_y = box[1]
         box_width = box[2]
@@ -412,10 +444,8 @@ def apply_cow_pattern(image: Image, alpha_of_cow_pattern: int = 85):
     return image
 
 
-def apply_salt_n_pepper(image: Image, alpha_of_salt_n_pepper: int = 90):
-    box_and_keypoints_list = get_box_and_keypoints(image, True)
-
-    for (box, keypoints) in box_and_keypoints_list:
+def apply_salt_n_pepper(image: Image, keypoints, alpha_of_salt_n_pepper: int = 90):
+    for (box, keypoints) in keypoints:
         box_upper_left_x = box[0]
         box_upper_left_y = box[1]
         box_width = box[2]
