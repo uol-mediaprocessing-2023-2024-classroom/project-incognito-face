@@ -89,10 +89,10 @@
                 <div>
                   <h3>{{ algorithm.displayName }}<br /></h3>
                   <p>
-                    Has Face:
+                    Number of faces:
                     {{
                       getFaceImage(algorithm.name)
-                        ? getFaceImage(algorithm.name).has_face
+                        ? getFaceImage(algorithm.name).number_of_faces
                         : "?"
                     }}
                     <br />

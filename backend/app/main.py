@@ -6,25 +6,22 @@ import ssl
 from contextlib import redirect_stdout
 
 import dlib
-import time
 import json
 import base64
 import hashlib
 import threading
-import urllib.request
 import concurrent.futures
 
 from fastapi import FastAPI, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageDraw
 from mtcnn import MTCNN
 from pydantic import BaseModel
 from pathlib import Path
 from io import BytesIO
 import cv2
 import numpy
-from matplotlib import pyplot as plt
 
 app = FastAPI()
 IMAGE_PATH = Path(__file__).parent.parent.parent / 'images'
@@ -200,7 +197,7 @@ async def apply_filter(data: FilterRequestData):
         case 'faceMask':
             img = apply_whole_face_mask(img, get_keypoints(img, True, data.hash))
         case 'medicineMask':
-            img = apply_medicine_mask(img), get_keypoints(img, True, data.hash)
+            img = apply_medicine_mask(img, get_keypoints(img, True, data.hash))
         case 'cowFace':
             img = apply_cow_pattern(img, get_keypoints(img, True, data.hash))
         case 'saltNPepper':
@@ -276,14 +273,17 @@ def get_keypoints(image: Image, wait_for_result=False, img_hash=None):
         return cache[img_hash]
 
 
+# TODO: add face keypoints (eyes + mouth, nose)
 def threaded_keypoints(img_hash: str, image: Image):
-    detector = MTCNN()
-    with io.StringIO() as dummy_stdout:
-        with redirect_stdout(dummy_stdout):
-            detected_faces = detector.detect_faces(numpy.asarray(image))
+    gray_image = cv2.cvtColor(numpy.asarray(image), cv2.COLOR_BGR2GRAY)
+    faces = hog_svm_detector(gray_image)
     box_and_keypoints_list = []
-    for face in detected_faces:
-        box_and_keypoints_list.append((face['box'], face['keypoints']))
+    for face in faces:
+        all_landmarks = hog_svm_shape_predictor(gray_image, face)
+        box = [face.left(), face.top(), face.width(), face.height()]
+        face_keypoints = calculate_face_keypoints(all_landmarks)
+        face_shape_landmarks = calculate_face_shape_landmarks(all_landmarks)
+        box_and_keypoints_list.append((box, face_keypoints, face_shape_landmarks))
     with lock:
         cache[img_hash] = box_and_keypoints_list
         del running_threads[img_hash]
@@ -291,25 +291,66 @@ def threaded_keypoints(img_hash: str, image: Image):
             json.dump(cache, file)
 
 
+# TODO: Maybe the y-mirrored points should also be mirrored on the x-axes
+def calculate_face_shape_landmarks(all_landmarks):
+    face_shape_landmarks = []
+    for i in range(17):
+        x, y = all_landmarks.part(i).x, all_landmarks.part(i).y
+        face_shape_landmarks.append((x, y))
+
+    y_mirror = (face_shape_landmarks[0][1] + face_shape_landmarks[16][1]) / 2
+    for i in range(17):
+        x, y = face_shape_landmarks[16 - i]
+        face_shape_landmarks.append((x, y + int(2 * (y_mirror - y))))
+    return face_shape_landmarks
+
+
+def calculate_face_keypoints(all_landmarks):
+
+    # Extract landmarks for the keypoints
+    left_eye_landmarks = all_landmarks.parts()[36:42]
+    right_eye_landmarks = all_landmarks.parts()[42:48]
+
+    # Calculate the midpoint of the left eye
+    left_eye_midpoint = (
+        sum([point.x for point in left_eye_landmarks]) // len(left_eye_landmarks),
+        sum([point.y for point in left_eye_landmarks]) // len(left_eye_landmarks)
+    )
+
+    # Calculate the midpoint of the right eye
+    right_eye_midpoint = (
+        sum([point.x for point in right_eye_landmarks]) // len(right_eye_landmarks),
+        sum([point.y for point in right_eye_landmarks]) // len(right_eye_landmarks)
+    )
+
+    # Add points to dictionary
+    face_keypoints = {'left_eye': left_eye_midpoint, 'right_eye': right_eye_midpoint,
+                      'left_mouth': (all_landmarks.part(48).x, all_landmarks.part(48).y),
+                      'right_mouth': (all_landmarks.part(54).x, all_landmarks.part(54).y),
+                      'nose': (all_landmarks.part(30).x, all_landmarks.part(30).y)}
+
+    return face_keypoints
+
+
 def process_algorithm(algorithm, img):
     img = Image.open(BytesIO(base64.b64decode(img[22:])))
     match algorithm['name']:
         case 'viola-jones':
-            img, has_face, confidence = highlight_face_viola_jones(img)
+            img, number_of_faces, confidence = highlight_face_viola_jones(img)
         case 'hog-svm':
-            img, has_face, confidence = highlight_face_hog_svm(img)
+            img, number_of_faces, confidence = highlight_face_hog_svm(img)
         case 'cnn':
-            img, has_face, confidence = highlight_face_cnn(img)
+            img, number_of_faces, confidence = highlight_face_cnn(img)
         case 'mtcnn':
-            img, has_face, confidence = highlight_face_mtcnn(img)
+            img, number_of_faces, confidence = highlight_face_mtcnn(img)
         case 'ssd':
-            img, has_face, confidence = highlight_face_ssd(img)
+            img, number_of_faces, confidence = highlight_face_ssd(img)
     img_bytes_io = BytesIO()
     img.save(img_bytes_io, format='JPEG')
     return {
         'name': algorithm['name'],
         'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}',
-        'has_face': has_face,
+        'number_of_faces': number_of_faces,
         'confidence': confidence
     }
 
@@ -354,9 +395,9 @@ def apply_opening(image: Image):
 def apply_sunglasses(image: Image, keypoints, scale_factor: float = 2.5):
     foreground = Image.open('filters/sunglasses.png')
 
-    for (box, keypoints) in keypoints:
-        left_eye = keypoints['left_eye']
-        right_eye = keypoints['right_eye']
+    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+        left_eye = face_keypoints['left_eye']
+        right_eye = face_keypoints['right_eye']
         dx = right_eye[0] - left_eye[0]
         dy = right_eye[1] - left_eye[1]
         angle_radians = math.atan2(-dy, dx)
@@ -385,9 +426,9 @@ def apply_sunglasses(image: Image, keypoints, scale_factor: float = 2.5):
 def apply_whole_face_mask(image: Image, keypoints):
     foreground = Image.open('filters/whole_face_mask.png').convert("RGBA")
 
-    for (box, keypoints) in keypoints:
-        left_eye = keypoints['left_eye']
-        right_eye = keypoints['right_eye']
+    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+        left_eye = face_keypoints['left_eye']
+        right_eye = face_keypoints['right_eye']
         dx = right_eye[0] - left_eye[0]
         dy = right_eye[1] - left_eye[1]
         angle_radians = math.atan2(-dy, dx)
@@ -412,9 +453,9 @@ def apply_whole_face_mask(image: Image, keypoints):
 def apply_medicine_mask(image: Image, keypoints):
     foreground = Image.open('filters/medicine_mask.png').convert("RGBA")
 
-    for (box, keypoints) in keypoints:
-        left_mouth = keypoints['mouth_left']
-        right_mouth = keypoints['mouth_right']
+    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+        left_mouth = face_keypoints['left_mouth']
+        right_mouth = face_keypoints['right_mouth']
         dx = right_mouth[0] - left_mouth[0]
         dy = right_mouth[1] - left_mouth[1]
         angle_radians = math.atan2(-dy, dx)
@@ -426,7 +467,7 @@ def apply_medicine_mask(image: Image, keypoints):
 
         rotated_overlay = foreground.rotate(angle_degrees, expand=True)
 
-        left_upper_face_mask = (box[0], keypoints['nose'][1])
+        left_upper_face_mask = (box[0], face_keypoints['nose'][1])
 
         left_upper_paste = (left_upper_face_mask[0], int(left_upper_face_mask[1] - math.fabs(
             math.cos(math.radians(90 - angle_degrees)) * face_width)))
@@ -438,21 +479,46 @@ def apply_medicine_mask(image: Image, keypoints):
 
 def apply_cow_pattern(image: Image, keypoints, alpha_of_cow_pattern: int = 85):
     foreground = Image.open('../backend/filters/cow_pattern.png').convert("RGBA")
-    foreground.putalpha(alpha_of_cow_pattern)
 
-    for (box, keypoints) in keypoints:
-        box_upper_left_x = box[0]
-        box_upper_left_y = box[1]
-        box_width = box[2]
-        box_height = box[3]
-        resized_foreground = foreground.resize((box_width, box_height), resample=Image.LANCZOS)
-        image.paste(resized_foreground, (box_upper_left_x, box_upper_left_y), resized_foreground)
+    # Create foreground from filter
+    foreground_parts = Image.new('RGBA', image.size)
+
+    # Add cow pattern at face position
+    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+        minX = min(row[0] for row in face_shape_landmarks)
+        maxX = max(row[0] for row in face_shape_landmarks)
+        minY = min(row[1] for row in face_shape_landmarks)
+        maxY = max(row[1] for row in face_shape_landmarks)
+        new_foreground_part = foreground.resize((maxX - minX, maxY - minY), resample=Image.LANCZOS)
+        foreground_parts.paste(new_foreground_part, (minX, minY), new_foreground_part)
+
+    # Apply alpha
+    foreground_parts.putalpha(alpha_of_cow_pattern)
+
+    # Create image from filters with mask
+    shaped_foreground = Image.new('RGBA', image.size)
+
+    # Create a mask image with the same size as the original image
+    mask = Image.new('L', foreground_parts.size, 0)
+
+    # Create a drawing context for the mask
+    draw = ImageDraw.Draw(mask)
+
+    # Add shape to mask
+    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+        draw.polygon(face_shape_landmarks, fill=255)
+
+    # Apply the mask to the new foreground
+    shaped_foreground.paste(foreground_parts, mask=mask)
+
+    # Apply the new foreground to the original image
+    image.paste(shaped_foreground, mask=shaped_foreground)
 
     return image
 
 
 def apply_salt_n_pepper(image: Image, keypoints, alpha_of_salt_n_pepper: int = 90):
-    for (box, keypoints) in keypoints:
+    for (box, face_keypoints, face_shape_landmarks) in keypoints:
         box_upper_left_x = box[0]
         box_upper_left_y = box[1]
         box_width = box[2]
@@ -467,6 +533,7 @@ def apply_salt_n_pepper(image: Image, keypoints, alpha_of_salt_n_pepper: int = 9
         image.paste(pixels_with_alpha, (box_upper_left_x, box_upper_left_y), pixels_with_alpha)
 
     return image
+
 
 # ToDo Values are hardcoded change with sliders later on
 def apply_hide_with_masks(img: Image, box_and_keypoints_list: list[tuple[list, dict]], number_of_masks: int = 40,
@@ -491,19 +558,17 @@ def apply_hide_with_masks(img: Image, box_and_keypoints_list: list[tuple[list, d
     return img
 
 
+
 def highlight_face_viola_jones(img: Image):
     img = cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
     gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    face = viola_jones_detector.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
+    faces = viola_jones_detector.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
 
-    detected_a_face = False
-
-    for (x, y, w, h) in face:
-        detected_a_face = True
+    for (x, y, w, h) in faces:
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 6)
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(img_rgb), detected_a_face, '?'
+    return Image.fromarray(img_rgb), len(faces), '?'
 
 
 def highlight_face_hog_svm(img: Image):
@@ -511,31 +576,25 @@ def highlight_face_hog_svm(img: Image):
     gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = hog_svm_detector(gray_image)
 
-    detected_a_face = False
-
     for face in faces:
-        detected_a_face = True
         x, y, w, h = face.left(), face.top(), face.width(), face.height()
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 0), 6)
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(img_rgb), detected_a_face, '?'
+    return Image.fromarray(img_rgb), len(faces), '?'
 
 
 def highlight_face_cnn(img: Image):
     img = numpy.array(img)
     faces = cnn_detector(img)
-
-    detected_a_face = False
     confidence = 100
 
     for face in faces:
-        detected_a_face = True
         confidence = round(face.confidence * 100, 3)
         x, y, w, h = face.rect.left(), face.rect.top(), face.rect.width(), face.rect.height()
         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 6)
 
-    return Image.fromarray(img), detected_a_face, confidence
+    return Image.fromarray(img), len(faces), confidence
 
 
 def highlight_face_mtcnn(img: Image):
@@ -545,16 +604,14 @@ def highlight_face_mtcnn(img: Image):
         with redirect_stdout(dummy_stdout):
             faces = mtcnn_detector.detect_faces(img)
 
-    detected_a_face = False
     confidence = 100
 
     for face in faces:
-        detected_a_face = True
         confidence = round(face['confidence'] * 100, 3)
         x, y, w, h = face['box'][0], face['box'][1], face['box'][2], face['box'][3]
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 255), 6)
 
-    return Image.fromarray(img), detected_a_face, confidence
+    return Image.fromarray(img), len(faces), confidence
 
 
 def highlight_face_ssd(img: Image):
@@ -564,20 +621,20 @@ def highlight_face_ssd(img: Image):
     ssd_detector.setInput(imageBlob)
     detections = ssd_detector.forward()
 
-    detected_a_face = False
     confidence = 100
+    number_of_faces = 0
 
     # only show detections over 80% certainty
     for row in detections[0][0]:
         if row[2] > 0.80:
-            detected_a_face = True
             confidence = round(row[2] * 100, 3)
+            number_of_faces += 1
             x1, y1, x2, y2 = int(row[3] * img.shape[1]), int(row[4] * img.shape[0]), int(row[5] * img.shape[1]), int(
                 row[6] * img.shape[0])
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 255), 6)
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(img_rgb), detected_a_face, confidence
+    return Image.fromarray(img_rgb), number_of_faces, confidence
 
 
 # Global exception handler that catches all exceptions not handled by specific exception handlers.
@@ -597,9 +654,11 @@ mtcnn_detector = MTCNN()
 ssd_detector = cv2.dnn.readNetFromCaffe("resources/deploy.prototxt",
                                         "resources/res10_300x300_ssd_iter_140000.caffemodel")
 
+# Load shape predictors
+hog_svm_shape_predictor = dlib.shape_predictor('resources/shape_predictor_68_face_landmarks.dat')
+
 
 # auxiliary methods
-
 def apply_alpha_to_transparent_image(foreground: Image, alpha_of_masks: int) -> Image:
     foreground_copy = foreground.copy()
     foreground_copy.putalpha(alpha_of_masks)
