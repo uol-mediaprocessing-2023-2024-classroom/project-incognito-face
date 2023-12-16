@@ -505,7 +505,8 @@ def apply_cow_pattern(image: Image, keypoints, alpha_of_cow_pattern: int = 85):
 
     # Add shape to mask
     for (box, face_keypoints, face_shape_landmarks) in keypoints:
-        draw.polygon(face_shape_landmarks, fill=255)
+        flat_list = [coordinate for point in face_shape_landmarks for coordinate in point]
+        draw.polygon(flat_list, fill=255)
 
     # Apply the mask to the new foreground
     shaped_foreground.paste(foreground_parts, mask=mask)

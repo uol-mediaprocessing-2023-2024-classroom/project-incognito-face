@@ -178,9 +178,6 @@ export default {
     },
 
     runFaceDetection(image) {
-      if (this.currentAlgorithms == null || this.currentAlgorithms.length <= 0) {
-        this.$emit("loadAlgorithms", image);
-      }
       this.$emit("runFaceDetection", image);
     },
 
@@ -234,8 +231,8 @@ export default {
 }
 
 .resultImg {
-  max-width: 200px;
-  max-height: 200px;
+  max-width: 150px;
+  max-height: 150px;
 }
 
 .resultTable {

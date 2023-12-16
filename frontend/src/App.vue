@@ -10,7 +10,6 @@
         :faceResult="faceResult"
         @loadImages="loadImages"
         @loadFilters="loadFilters"
-        @loadAlgorithms="loadAlgorithms"
         @selectImage="selectImage"
         @selectFilter="selectFilter"
         @applyFilter="applyFilter"
@@ -61,11 +60,6 @@ export default {
       this.currentFilters = await response.json();
     },
 
-    async loadAlgorithms() {
-      const response = await fetch(this.backendHost + "/get-algorithms");
-      this.currentAlgorithms = await response.json();
-    },
-
     async selectImage(image) {
       // Deepcopy to keep the gallery intact
       this.selectedImage = JSON.parse(JSON.stringify(image));
@@ -97,6 +91,7 @@ export default {
         base64: image.base64,
         hash: image.hash
       };
+      // this.selectedImage.base64 = require("@/assets/loading.json").base64; // TODO: currently garbage css
       const response = await fetch(this.backendHost + "/apply-filter", {
         method: "POST",
         headers: {
@@ -108,10 +103,25 @@ export default {
       this.selectedImage.base64 = jsonResponse.base64;
     },
 
+    async loadAlgorithms() {
+      const response = await fetch(this.backendHost + "/get-algorithms");
+      this.currentAlgorithms = await response.json();
+    },
+
     async runFaceDetection(image) {
       if (image == null) {
         return;
       }
+      if (this.currentAlgorithms == null || this.currentAlgorithms.length <= 0) {
+        console.log("loading!");
+        await this.loadAlgorithms();
+      }
+      const loading = require("@/assets/loading.json"); 
+      this.faceResult = this.currentAlgorithms.map(algorithm => ({
+        name: algorithm.name,
+        base64: loading.base64
+      }));
+      console.log(this.currentAlgorithms);
       const requestBody = {
         base64: image.base64,
         hash: image.hash
