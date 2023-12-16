@@ -1,6 +1,7 @@
 import io
 import math
 import os
+import random
 import ssl
 from contextlib import redirect_stdout
 
@@ -72,7 +73,7 @@ FILTERS = [
         'name': 'closing',
         'displayName': 'Closing'
     },
-        {
+    {
         'name': 'opening',
         'displayName': 'Opening'
     },
@@ -95,19 +96,24 @@ FILTERS = [
     {
         'name': 'saltNPepper',
         'displayName': 'Salt and Pepper'
+    },
+    {
+        'name': 'hideWithMasks',
+        'displayName': 'Hide With Masks'
     }
 ]
 
 cache = {}
 running_threads = {}
-lock = threading.Lock() 
+lock = threading.Lock()
 
 if os.path.isfile(CACHE_FILE):
     try:
         with open(CACHE_FILE, 'r') as file:
             cache = json.load(file)
             print(f'Loaded cache from {CACHE_FILE}')
-    except: pass
+    except:
+        pass
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -199,6 +205,8 @@ async def apply_filter(data: FilterRequestData):
             img = apply_cow_pattern(img, get_keypoints(img, True, data.hash))
         case 'saltNPepper':
             img = apply_salt_n_pepper(img, get_keypoints(img, True, data.hash))
+        case 'hideWithMasks':
+            img = apply_hide_with_masks(img, get_keypoints(img, True, data.hash))
 
     img_bytes_io = BytesIO()
     img.save(img_bytes_io, format='JPEG')
@@ -253,7 +261,7 @@ def get_image_hash(image):
 def get_keypoints(image: Image, wait_for_result=False, img_hash=None):
     if img_hash is None:
         img_hash = get_image_hash(image)
-    thread = None 
+    thread = None
     with lock:
         if img_hash in cache.keys():
             return cache[img_hash]
@@ -440,7 +448,6 @@ def apply_cow_pattern(image: Image, keypoints, alpha_of_cow_pattern: int = 85):
         resized_foreground = foreground.resize((box_width, box_height), resample=Image.LANCZOS)
         image.paste(resized_foreground, (box_upper_left_x, box_upper_left_y), resized_foreground)
 
-
     return image
 
 
@@ -460,6 +467,29 @@ def apply_salt_n_pepper(image: Image, keypoints, alpha_of_salt_n_pepper: int = 9
         image.paste(pixels_with_alpha, (box_upper_left_x, box_upper_left_y), pixels_with_alpha)
 
     return image
+
+# ToDo Values are hardcoded change with sliders later on
+def apply_hide_with_masks(img: Image, box_and_keypoints_list: list[tuple[list, dict]], number_of_masks: int = 40,
+                          face_mask_width: int = 75, face_mask_height: int = 75,
+                          alpha_of_masks: int = 45):
+    # Apply alpha to foreground (image must have transparent background so that this works)
+    foreground = Image.open('../backend/filters/whole_face_mask.png').convert('RGBA')
+    foreground_alpha = apply_alpha_to_transparent_image(foreground, alpha_of_masks)
+
+    # find coordinates of faces on image
+    face_and_mask_coordinates = find_face_rectangles_mtcnn(box_and_keypoints_list)
+
+    # find free coordinates for mask
+    mask_cords = find_free_coordinates_outside_of_rectangles(img, number_of_masks, face_mask_width, face_mask_height,
+                                                             face_and_mask_coordinates)
+
+    # insert masks on image
+    for mask_coords in mask_cords:
+        resized_foreground = foreground_alpha.resize((face_mask_width, face_mask_height), resample=Image.LANCZOS)
+        img.paste(resized_foreground, (mask_coords[0], mask_coords[1]), resized_foreground)
+
+    return img
+
 
 def highlight_face_viola_jones(img: Image):
     img = cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
@@ -566,3 +596,58 @@ cnn_detector = dlib.cnn_face_detection_model_v1("resources/mmod_human_face_detec
 mtcnn_detector = MTCNN()
 ssd_detector = cv2.dnn.readNetFromCaffe("resources/deploy.prototxt",
                                         "resources/res10_300x300_ssd_iter_140000.caffemodel")
+
+
+# auxiliary methods
+
+def apply_alpha_to_transparent_image(foreground: Image, alpha_of_masks: int) -> Image:
+    foreground_copy = foreground.copy()
+    foreground_copy.putalpha(alpha_of_masks)
+    foreground.paste(foreground_copy, mask=foreground)
+    return foreground
+
+
+def find_face_rectangles_mtcnn(box_and_keypoints_list: list[tuple[list, dict]]) -> list[tuple[int, int, int, int]]:
+    face_coordinates = []
+    for (box, keypoints) in box_and_keypoints_list:
+        box_upper_left_x = box[0]
+        box_upper_left_y = box[1]
+        box_width = box[2]
+        box_height = box[3]
+        face_coordinates.append(
+            (box_upper_left_x, box_upper_left_y, box_width, box_height))
+    return face_coordinates
+
+
+def find_free_coordinates_outside_of_rectangles(img: Image, number_of_inserted_items: int, width_of_inserted_item: int,
+                                                height_of_inserted_item: int, taken_coordinates=None,
+                                                search_limit_per_try: int = 2500) -> list[tuple[int, int]]:
+    if taken_coordinates is None:
+        taken_coordinates = []
+
+    width, height = img.size
+    inserted_items = 0
+    inserted_items_coords = []
+    unsuccessful_tries = 0
+    while inserted_items < number_of_inserted_items:
+        if unsuccessful_tries >= search_limit_per_try:
+            break
+
+        item_x = random.randint(0, width - 1)
+        item_y = random.randint(0, height - 1)
+        inserted = True
+        for coordinates in taken_coordinates:
+            is_outside_of_rectangle = (item_x + width_of_inserted_item < coordinates[0]
+                                       or item_x > coordinates[0] + coordinates[2]
+                                       or item_y > coordinates[1] + coordinates[3]
+                                       or item_y + height_of_inserted_item < coordinates[1])
+            if not is_outside_of_rectangle:
+                inserted = False
+                break
+        if not inserted:
+            unsuccessful_tries += 1
+            continue
+        inserted_items += 1
+        inserted_items_coords.append((item_x, item_y))
+        taken_coordinates.append((item_x, item_y, width_of_inserted_item, height_of_inserted_item))
+    return inserted_items_coords
