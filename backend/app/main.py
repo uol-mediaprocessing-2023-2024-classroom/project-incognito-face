@@ -667,7 +667,7 @@ def apply_alpha_to_transparent_image(foreground: Image, alpha_of_masks: int) -> 
 
 def find_face_rectangles_mtcnn(box_and_keypoints_list: list[tuple[list, dict]]) -> list[tuple[int, int, int, int]]:
     face_coordinates = []
-    for (box, keypoints) in box_and_keypoints_list:
+    for (box, face_keypoints, face_shape_landmarks) in box_and_keypoints_list:
         box_upper_left_x = box[0]
         box_upper_left_y = box[1]
         box_width = box[2]
