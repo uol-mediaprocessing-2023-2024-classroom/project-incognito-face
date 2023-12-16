@@ -273,7 +273,6 @@ def get_keypoints(image: Image, wait_for_result=False, img_hash=None):
         return cache[img_hash]
 
 
-# TODO: add face keypoints (eyes + mouth, nose)
 def threaded_keypoints(img_hash: str, image: Image):
     gray_image = cv2.cvtColor(numpy.asarray(image), cv2.COLOR_BGR2GRAY)
     faces = hog_svm_detector(gray_image)
@@ -291,17 +290,17 @@ def threaded_keypoints(img_hash: str, image: Image):
             json.dump(cache, file)
 
 
-# TODO: Maybe the y-mirrored points should also be mirrored on the x-axes
 def calculate_face_shape_landmarks(all_landmarks):
     face_shape_landmarks = []
     for i in range(17):
         x, y = all_landmarks.part(i).x, all_landmarks.part(i).y
         face_shape_landmarks.append((x, y))
 
+    x_mirror = (face_shape_landmarks[0][0] + face_shape_landmarks[16][0]) / 2
     y_mirror = (face_shape_landmarks[0][1] + face_shape_landmarks[16][1]) / 2
     for i in range(17):
         x, y = face_shape_landmarks[16 - i]
-        face_shape_landmarks.append((x, y + int(2 * (y_mirror - y))))
+        face_shape_landmarks.append((x + int(2 * (x_mirror - x)), y + int(2 * (y_mirror - y))))
     return face_shape_landmarks
 
 
