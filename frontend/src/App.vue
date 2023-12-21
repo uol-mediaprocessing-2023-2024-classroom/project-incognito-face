@@ -41,7 +41,7 @@ export default {
       allImgData: [],
       limit: 60,
       loadedAmount: 0,
-      backendHost: "http://127.0.0.1:8000"
+      backendHost: "http://127.0.0.1:8000",
     };
   },
 
@@ -66,9 +66,9 @@ export default {
 
       const requestBody = {
         base64: image.base64,
-        hash: image.hash
+        hash: image.hash,
       };
-      const response = await fetch("http://127.0.0.1:8000/generate-keypoints", {
+      const response = await fetch(this.backendHost + "/generate-keypoints", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,7 +89,7 @@ export default {
       const requestBody = {
         filter: this.selectedFilter.name,
         base64: image.base64,
-        hash: image.hash
+        hash: image.hash,
       };
       // this.selectedImage.base64 = require("@/assets/loading.json").base64; // TODO: currently garbage css
       const response = await fetch(this.backendHost + "/apply-filter", {
@@ -113,18 +113,16 @@ export default {
         return;
       }
       if (this.currentAlgorithms == null || this.currentAlgorithms.length <= 0) {
-        console.log("loading!");
         await this.loadAlgorithms();
       }
-      const loading = require("@/assets/loading.json"); 
-      this.faceResult = this.currentAlgorithms.map(algorithm => ({
+      const loading = require("@/assets/loading.json");
+      this.faceResult = this.currentAlgorithms.map((algorithm) => ({
         name: algorithm.name,
-        base64: loading.base64
+        base64: loading.base64,
       }));
-      console.log(this.currentAlgorithms);
       const requestBody = {
         base64: image.base64,
-        hash: image.hash
+        hash: image.hash,
       };
       const response = await fetch(this.backendHost + "/run-face-detection", {
         method: "POST",

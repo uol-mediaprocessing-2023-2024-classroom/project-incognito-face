@@ -35,23 +35,31 @@
             <button class="basicButton" @click="runFaceDetection(selectedImage)">
               Run Face Detection
             </button>
+            <button class="basicButton" @click="downloadImage()">Download Image</button>
 
             <div>
               <h3>Image Info:<br /></h3>
               <p>
-                {{ selectedImage && selectedImage.name ? "Name: " + selectedImage.name : "" }}
+                {{
+                  selectedImage && selectedImage.name ? "Name: " + selectedImage.name : ""
+                }}
               </p>
               <p>
                 {{
                   selectedImage && selectedImage.timestamp > 0
-                    ? "Date: " + new Date(
-                        this.selectedImage.timestamp * 1000
-                      ).toLocaleString("de-DE", { hour12: false })
+                    ? "Date: " +
+                      new Date(selectedImage.timestamp * 1000).toLocaleString("de-DE", {
+                        hour12: false,
+                      })
                     : ""
                 }}
               </p>
               <p>
-                {{ selectedImage && selectedImage.hash ? "Hash: " + selectedImage.hash.slice(0, 16) + "..." : "" }}
+                {{
+                  selectedImage && selectedImage.hash
+                    ? "Hash: " + selectedImage.hash.slice(0, 15) + "..."
+                    : ""
+                }}
               </p>
             </div>
           </div>
@@ -89,19 +97,11 @@
                 <div>
                   <h3>{{ algorithm.displayName }}<br /></h3>
                   <p>
-                    Number of faces:
                     {{
                       getFaceImage(algorithm.name)
-                        ? getFaceImage(algorithm.name).number_of_faces
-                        : "?"
+                        ? getFaceImage(algorithm.name).metadata
+                        : ""
                     }}
-                    <br />
-                    Confidence:
-                    {{
-                      getFaceImage(algorithm.name)
-                        ? getFaceImage(algorithm.name).confidence
-                        : 0
-                    }}%
                   </p>
                 </div>
               </td>
@@ -165,27 +165,42 @@ export default {
     loadFilters() {
       this.$emit("loadFilters");
     },
-
     selectImage(image) {
       this.$emit("selectImage", image);
     },
     selectFilter(filter) {
       this.$emit("selectFilter", filter);
     },
-
     applyFilter(image) {
       this.$emit("applyFilter", image);
     },
-
     runFaceDetection(image) {
       this.$emit("runFaceDetection", image);
     },
-
     getFaceImage(name) {
       if (this.faceResult == null || this.faceResult.length <= 0) {
         return "";
       }
       return this.faceResult.find((obj) => obj.name === name);
+    },
+    downloadImage() {
+      const base64 = this.selectedImage.base64.split(",")[1];
+      const contentType = this.selectedImage.base64
+        .split(",")[0]
+        .split(":")[1]
+        .split(";")[0];
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: contentType });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = this.selectedImage.name;
+      link.click();
+      URL.revokeObjectURL(link.href);
     },
   },
 

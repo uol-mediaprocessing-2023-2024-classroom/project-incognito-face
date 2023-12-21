@@ -56,7 +56,7 @@ FILTERS = [
     },
     {
         'name': 'dithering',
-        'displayName': 'Floyd Steinberg'
+        'displayName': 'Quantize Colors'
     },
     {
         'name': 'closing',
@@ -89,6 +89,10 @@ FILTERS = [
     {
         'name': 'hideWithMasks',
         'displayName': 'Hide With Masks'
+    },
+    {
+        'name': 'hightlightKeypoints',
+        'displayName': 'Highlight Keypoints'
     }
 ]
 
@@ -106,17 +110,9 @@ if os.path.isfile(CACHE_FILE):
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# CORS configuration: specify the origins that are allowed to make cross-site requests
-origins = [
-    'https://localhost:8080',
-    'http://localhost:8080',
-    'http://localhost:8081',
-    'https://localhost:8081'
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=['*'],
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
@@ -193,6 +189,8 @@ async def apply_filter(data: FilterRequestData):
             img = apply_salt_n_pepper(img, keypoints)
         case 'hideWithMasks':
             img = apply_hide_with_masks(img, keypoints)
+        case 'hightlightKeypoints':
+            img = highlight_keypoints(img, keypoints)
 
     img_bytes_io = BytesIO()
     img.save(img_bytes_io, format='JPEG')
@@ -337,8 +335,7 @@ def process_algorithm(algorithm, img):
     return {
         'name': algorithm['name'],
         'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}',
-        'number_of_faces': number_of_faces,
-        'confidence': confidence
+        'metadata': f'Number of faces: {number_of_faces}'
     }
 
 
@@ -360,7 +357,7 @@ def apply_horizontal_edge(image: Image) -> Image:
 
 
 def apply_dithering(image: Image, keypoints, apply_only_on_face=True) -> Image:
-    modified_image = image.convert('RGB').quantize(colors=16, method=Image.FLOYDSTEINBERG).convert('RGB')
+    modified_image = image.convert('RGB').quantize(colors=16).convert('RGB')
 
     if apply_only_on_face:
         return swap_images_at_face_position(image, keypoints, modified_image)
@@ -493,6 +490,24 @@ def apply_medicine_mask(image: Image, keypoints):
 
         image.paste(rotated_overlay, left_upper_paste, rotated_overlay)
 
+    return image
+
+
+def highlight_keypoints(image: Image, keypoints):
+    draw = ImageDraw.Draw(image)
+    if len(keypoints) > 0:
+        for keypoint_set in keypoints:
+            for j in range(len(keypoint_set[2])):
+                x, y = keypoint_set[2][j]
+                if j < len(keypoint_set[2]) - 1:
+                    next_x, next_y = keypoint_set[2][j + 1]
+                    draw.line((x, y, next_x, next_y), fill='lightgreen', width=3)
+                radius = 5
+                draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill='green', outline='lightgreen')
+            for feature, coords in keypoint_set[1].items():
+                x, y = coords
+                radius = 10
+                draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill='red', outline='red')
     return image
 
 
