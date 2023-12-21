@@ -9,7 +9,7 @@ from sklearn import datasets
 from matplotlib import pyplot as plt
 import ImageModification as imod
 from mtcnn.mtcnn import MTCNN
-from PIL import Image as PILImage, Image
+
 
 
 def get_faces():
