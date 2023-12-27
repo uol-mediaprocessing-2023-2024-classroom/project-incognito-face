@@ -11,6 +11,7 @@ import base64
 import hashlib
 import threading
 import concurrent.futures
+import face_recognition
 
 from fastapi import FastAPI, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +22,7 @@ from pydantic import BaseModel
 from pathlib import Path
 from io import BytesIO
 import cv2
-import numpy
+import numpy as np
 
 app = FastAPI()
 IMAGE_PATH = Path(__file__).parent.parent.parent / 'images'
@@ -261,7 +262,7 @@ def get_keypoints(image: Image, wait_for_result=False, img_hash=None):
 
 
 def threaded_keypoints(img_hash: str, image: Image):
-    gray_image = cv2.cvtColor(numpy.asarray(image), cv2.COLOR_BGR2GRAY)
+    gray_image = cv2.cvtColor(np.asarray(image), cv2.COLOR_BGR2GRAY)
     faces = hog_svm_detector(gray_image)
     box_and_keypoints_list = []
     for face in faces:
@@ -269,7 +270,8 @@ def threaded_keypoints(img_hash: str, image: Image):
         box = [face.left(), face.top(), face.width(), face.height()]
         face_keypoints = calculate_face_keypoints(all_landmarks)
         face_shape_landmarks = calculate_face_shape_landmarks(all_landmarks)
-        box_and_keypoints_list.append((box, face_keypoints, face_shape_landmarks))
+        face_encodings = calculate_face_encodings(np.asarray(image))
+        box_and_keypoints_list.append((box, face_keypoints, face_shape_landmarks, face_encodings))
     with lock:
         cache[img_hash] = box_and_keypoints_list
         del running_threads[img_hash]
@@ -315,6 +317,15 @@ def calculate_face_keypoints(all_landmarks):
                       'nose': (all_landmarks.part(30).x, all_landmarks.part(30).y)}
 
     return face_keypoints
+
+
+def calculate_face_encodings(image):
+    face_locations = face_recognition.face_locations(image)
+    face_encodings = face_recognition.face_encodings(image, face_locations)
+    face_encoding_list = []
+    for face_encoding in face_encodings:
+        face_encoding_list.append(face_encoding.tolist())
+    return face_locations, face_encoding_list
 
 
 def process_algorithm(algorithm, img):
@@ -396,7 +407,7 @@ def swap_images_at_face_position(image: Image, keypoints, image_to_swap: Image) 
     foreground_parts = Image.new('RGBA', image.size)
 
     # Add cow pattern at face position
-    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         (minX, maxX), (minY, maxY), (width, height) = calculate_face_shape_landmarks_box_positions(face_shape_landmarks)
         new_foreground_part = image_to_swap.crop((minX, minY, maxX, maxY))
         new_foreground_part.putalpha(255)
@@ -411,7 +422,7 @@ def swap_images_at_face_position(image: Image, keypoints, image_to_swap: Image) 
 def apply_sunglasses(image: Image, keypoints, scale_factor: float = 2.5):
     foreground = Image.open('filters/sunglasses.png')
 
-    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         left_eye = face_keypoints['left_eye']
         right_eye = face_keypoints['right_eye']
         dx = right_eye[0] - left_eye[0]
@@ -442,7 +453,7 @@ def apply_sunglasses(image: Image, keypoints, scale_factor: float = 2.5):
 def apply_whole_face_mask(image: Image, keypoints):
     foreground = Image.open('filters/whole_face_mask.png').convert("RGBA")
 
-    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         left_eye = face_keypoints['left_eye']
         right_eye = face_keypoints['right_eye']
         dx = right_eye[0] - left_eye[0]
@@ -469,7 +480,7 @@ def apply_whole_face_mask(image: Image, keypoints):
 def apply_medicine_mask(image: Image, keypoints):
     foreground = Image.open('filters/medicine_mask.png').convert("RGBA")
 
-    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         left_mouth = face_keypoints['left_mouth']
         right_mouth = face_keypoints['right_mouth']
         dx = right_mouth[0] - left_mouth[0]
@@ -518,7 +529,7 @@ def apply_cow_pattern(image: Image, keypoints, alpha_of_cow_pattern: int = 85):
     foreground_parts = Image.new('RGBA', image.size)
 
     # Add cow pattern at face position
-    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         (minX, maxX), (minY, maxY), (width, height) = calculate_face_shape_landmarks_box_positions(face_shape_landmarks)
         new_foreground_part = foreground.resize((width, height), resample=Image.LANCZOS)
         foreground_parts.paste(new_foreground_part, (minX, minY), new_foreground_part)
@@ -537,13 +548,13 @@ def apply_salt_n_pepper(image: Image, keypoints, alpha_of_salt_n_pepper: int = 9
     foreground_parts = Image.new('RGBA', image.size)
 
     # Add salt_n_pepper at face position
-    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         (minX, maxX), (minY, maxY), (width, height) = calculate_face_shape_landmarks_box_positions(face_shape_landmarks)
-        pixels = numpy.zeros(width * height, dtype=numpy.uint8)
+        pixels = np.zeros(width * height, dtype=np.uint8)
         pixels[:width * height // 2] = 255  # Set first half to white (value 255)
-        numpy.random.shuffle(pixels)
-        rgb_box = numpy.stack((pixels, pixels, pixels), axis=-1)
-        rgb_box_reshaped = numpy.reshape(rgb_box, (height, width, 3))
+        np.random.shuffle(pixels)
+        rgb_box = np.stack((pixels, pixels, pixels), axis=-1)
+        rgb_box_reshaped = np.reshape(rgb_box, (height, width, 3))
         rgb_box_image = Image.fromarray(rgb_box_reshaped)
         rgb_box_image.putalpha(255)
         foreground_parts.paste(rgb_box_image, (minX, minY), rgb_box_image)
@@ -558,7 +569,7 @@ def apply_salt_n_pepper(image: Image, keypoints, alpha_of_salt_n_pepper: int = 9
 
 
 # ToDo Values are hardcoded change with sliders later on
-def apply_hide_with_masks(img: Image, box_and_keypoints_list: list[tuple[list, dict]], number_of_masks: int = 40,
+def apply_hide_with_masks(img: Image, keypoints, number_of_masks: int = 40,
                           face_mask_width: int = 75, face_mask_height: int = 75,
                           alpha_of_masks: int = 45):
     # Apply alpha to foreground (image must have transparent background so that this works)
@@ -566,7 +577,7 @@ def apply_hide_with_masks(img: Image, box_and_keypoints_list: list[tuple[list, d
     foreground_alpha = apply_alpha_to_transparent_image(foreground, alpha_of_masks)
 
     # find coordinates of faces on image
-    face_and_mask_coordinates = find_face_rectangles_mtcnn(box_and_keypoints_list)
+    face_and_mask_coordinates = find_face_rectangles_mtcnn(keypoints)
 
     # find free coordinates for mask
     mask_cords = find_free_coordinates_outside_of_rectangles(img, number_of_masks, face_mask_width, face_mask_height,
@@ -601,7 +612,7 @@ def apply_filter_on_faces(image: Image, keypoints, foreground_parts):
     draw = ImageDraw.Draw(mask)
 
     # Add shape to mask
-    for (box, face_keypoints, face_shape_landmarks) in keypoints:
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         flat_list = [coordinate for point in face_shape_landmarks for coordinate in point]
         draw.polygon(flat_list, fill=255)
 
@@ -615,7 +626,7 @@ def apply_filter_on_faces(image: Image, keypoints, foreground_parts):
 
 
 def highlight_face_viola_jones(img: Image):
-    img = cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
+    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
     gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = viola_jones_detector.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
 
@@ -627,7 +638,7 @@ def highlight_face_viola_jones(img: Image):
 
 
 def highlight_face_hog_svm(img: Image):
-    img = cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
+    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
     gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = hog_svm_detector(gray_image)
 
@@ -640,7 +651,7 @@ def highlight_face_hog_svm(img: Image):
 
 
 def highlight_face_cnn(img: Image):
-    img = numpy.array(img)
+    img = np.array(img)
     faces = cnn_detector(img)
     confidence = 100
 
@@ -653,7 +664,7 @@ def highlight_face_cnn(img: Image):
 
 
 def highlight_face_mtcnn(img: Image):
-    img = numpy.array(img)
+    img = np.array(img)
     # Disable printing
     with io.StringIO() as dummy_stdout:
         with redirect_stdout(dummy_stdout):
@@ -670,7 +681,7 @@ def highlight_face_mtcnn(img: Image):
 
 
 def highlight_face_ssd(img: Image):
-    img = cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
+    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
     resized_rgb_image = cv2.resize(img, (300, 300))
     imageBlob = cv2.dnn.blobFromImage(image=resized_rgb_image)
     ssd_detector.setInput(imageBlob)
@@ -690,6 +701,29 @@ def highlight_face_ssd(img: Image):
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return Image.fromarray(img_rgb), number_of_faces, confidence
+
+
+def recognize_faces_hog_svm(img: Image, keypoints):
+    unknown_face_locations, unknown_face_encodings = calculate_face_encodings(img)
+
+    face_encodings_orig = convert_face_enc_array(keypoints[3])
+    unknown_face_encodings = convert_face_enc_array(unknown_face_encodings)
+
+    for unknown_face_location, unknown_face_encoding in zip(unknown_face_locations, unknown_face_encodings):
+        matches = face_recognition.compare_faces(face_encodings_orig, unknown_face_encoding)
+
+        for match in matches:
+            if match:
+                top, right, bottom, left = unknown_face_location[0], unknown_face_location[1], unknown_face_location[2], \
+                unknown_face_location[3]
+                cv2.rectangle(img, (left, top), (right, bottom), (255, 255, 0), 6)
+
+
+def convert_face_enc_array(face_encodings):
+    face_encodings_array = []
+    for face_encoding in face_encodings:
+        face_encodings_array.append(np.array(face_encoding))
+    return face_encodings_array
 
 
 # Global exception handler that catches all exceptions not handled by specific exception handlers.
@@ -721,9 +755,9 @@ def apply_alpha_to_transparent_image(foreground: Image, alpha_of_masks: int) -> 
     return foreground
 
 
-def find_face_rectangles_mtcnn(box_and_keypoints_list: list[tuple[list, dict]]) -> list[tuple[int, int, int, int]]:
+def find_face_rectangles_mtcnn(keypoints) -> list[tuple[int, int, int, int]]:
     face_coordinates = []
-    for (box, face_keypoints, face_shape_landmarks) in box_and_keypoints_list:
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         box_upper_left_x = box[0]
         box_upper_left_y = box[1]
         box_width = box[2]
