@@ -9,11 +9,12 @@ import dlib
 import json
 import base64
 import hashlib
+import traceback
 import threading
 import concurrent.futures
 import face_recognition
 
-from fastapi import FastAPI, BackgroundTasks, Request
+from fastapi import FastAPI, BackgroundTasks, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from PIL import Image, ImageFilter, ImageDraw
@@ -129,8 +130,7 @@ def home():
 @app.get('/get-images')
 async def get_images():
     image_data_list = []
-    image_files = list(IMAGE_PATH.glob('*.jpg'))
-    # TODO: Add png images
+    image_files = list(IMAGE_PATH.glob('*.jpg')) + list(IMAGE_PATH.glob('*.png'))
     for img_path in image_files:
         image_data = get_image_data(img_path)
         image_data_list.append(image_data)
@@ -138,15 +138,48 @@ async def get_images():
 
 
 def get_image_data(img_path):
-    with open(img_path, 'rb') as image_file:
-        base64_encoded = base64.b64encode(image_file.read()).decode("utf-8")
-    base64_encoded = f'data:image/png;base64,{base64_encoded}'
+    with Image.open(img_path) as img:
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        with io.BytesIO() as buffer:
+            img.save(buffer, format='PNG')
+            buffer.seek(0)
+            base64_encoded = base64.b64encode(buffer.read()).decode("utf-8")
     return {
         'name': img_path.name,
         'timestamp': os.path.getmtime(img_path),
-        'base64': base64_encoded,
+        'base64': f'data:image/png;base64,{base64_encoded}',
         'hash': get_image_hash(base64_encoded)
     }
+
+
+class ConvertImageRequestData(BaseModel):
+    name: str
+    timestamp: str
+    base64: str
+
+
+@app.post('/convert-image')
+async def convert_image(data: ConvertImageRequestData):
+    try:
+        image_data = base64.b64decode(data.base64)
+        with Image.open(io.BytesIO(image_data)) as img:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            with io.BytesIO() as buffer:
+                img.save(buffer, format='PNG')
+                buffer.seek(0)
+                base64_encoded = base64.b64encode(buffer.read()).decode("utf-8")
+        
+        result = {
+            'name': data.name,
+            'timestamp': data.timestamp,
+            'base64': f'data:image/png;base64,{base64_encoded}',
+            'hash': get_image_hash(base64_encoded)
+        }
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get('/get-filters')
@@ -159,42 +192,45 @@ async def get_algorithms():
     return JSONResponse(content=FACE_DETECTION_ALGORITHMS)
 
 
-class FilterRequestData(BaseModel):
+class ApplyFilterRequestData(BaseModel):
     filter: str
     base64: str
     hash: str
 
 
 @app.post('/apply-filter')
-async def apply_filter(data: FilterRequestData):
+async def apply_filter(data: ApplyFilterRequestData):
     img = Image.open(BytesIO(base64.b64decode(data.base64[22:])))
-    keypoints = get_keypoints(img, True, data.hash)
-    match data.filter:
-        case 'blur':
-            img = apply_blur(img, keypoints)
-        case 'dithering':
-            img = apply_dithering(img, keypoints)
-        case 'closing':
-            img = apply_closing(img, keypoints)
-        case 'opening':
-            img = apply_opening(img, keypoints)
-        case 'sunglasses':
-            img = apply_sunglasses(img, keypoints)
-        case 'faceMask':
-            img = apply_whole_face_mask(img, keypoints)
-        case 'medicineMask':
-            img = apply_medicine_mask(img, keypoints)
-        case 'cowFace':
-            img = apply_cow_pattern(img, keypoints)
-        case 'saltNPepper':
-            img = apply_salt_n_pepper(img, keypoints)
-        case 'hideWithMasks':
-            img = apply_hide_with_masks(img, keypoints)
-        case 'hightlightKeypoints':
-            img = highlight_keypoints(img, keypoints)
-
+    try:
+        keypoints = get_keypoints(img, True, data.hash)
+        match data.filter:
+            case 'blur':
+                img = apply_blur(img, keypoints)
+            case 'dithering':
+                img = apply_dithering(img, keypoints)
+            case 'closing':
+                img = apply_closing(img, keypoints)
+            case 'opening':
+                img = apply_opening(img, keypoints)
+            case 'sunglasses':
+                img = apply_sunglasses(img, keypoints)
+            case 'faceMask':
+                img = apply_whole_face_mask(img, keypoints)
+            case 'medicineMask':
+                img = apply_medicine_mask(img, keypoints)
+            case 'cowFace':
+                img = apply_cow_pattern(img, keypoints)
+            case 'saltNPepper':
+                img = apply_salt_n_pepper(img, keypoints)
+            case 'hideWithMasks':
+                img = apply_hide_with_masks(img, keypoints)
+            case 'hightlightKeypoints':
+                img = highlight_keypoints(img, keypoints)
+    except Exception as e:
+        print(f'An error occurred while trying to run filter {data.filter}: {e}')
+        traceback.print_exc()
     img_bytes_io = BytesIO()
-    img.save(img_bytes_io, format='JPEG')
+    img.save(img_bytes_io, format='PNG')
     return JSONResponse(
         content={'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}'})
 
@@ -236,7 +272,7 @@ def get_image_hash(image):
         img_b64 = image[22:]
     elif isinstance(image, Image.Image):
         img_bytes_io = BytesIO()
-        image.save(img_bytes_io, format='JPEG')
+        image.save(img_bytes_io, format='PNG')
         img_b64 = base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")
     else:
         raise TypeError('Invalid image type')
@@ -330,19 +366,25 @@ def calculate_face_encodings(image):
 
 def process_algorithm(algorithm, img):
     img = Image.open(BytesIO(base64.b64decode(img[22:])))
-    match algorithm['name']:
-        case 'viola-jones':
-            img, number_of_faces, confidence = highlight_face_viola_jones(img)
-        case 'hog-svm':
-            img, number_of_faces, confidence = highlight_face_hog_svm(img)
-        case 'cnn':
-            img, number_of_faces, confidence = highlight_face_cnn(img)
-        case 'mtcnn':
-            img, number_of_faces, confidence = highlight_face_mtcnn(img)
-        case 'ssd':
-            img, number_of_faces, confidence = highlight_face_ssd(img)
+    try:
+        match algorithm['name']:
+            case 'viola-jones':
+                img, number_of_faces, confidence = highlight_face_viola_jones(img)
+            case 'hog-svm':
+                img, number_of_faces, confidence = highlight_face_hog_svm(img)
+            case 'cnn':
+                img, number_of_faces, confidence = highlight_face_cnn(img)
+            case 'mtcnn':
+                img, number_of_faces, confidence = highlight_face_mtcnn(img)
+            case 'ssd':
+                img, number_of_faces, confidence = highlight_face_ssd(img)
+    except Exception as e:
+        print(f'An error occurred while trying to run algorithm {algorithm.name}: {e}')
+        traceback.print_exc()
+        number_of_faces = 0
+        confidence = 0
     img_bytes_io = BytesIO()
-    img.save(img_bytes_io, format='JPEG')
+    img.save(img_bytes_io, format='PNG')
     return {
         'name': algorithm['name'],
         'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}',
@@ -368,7 +410,7 @@ def apply_horizontal_edge(image: Image) -> Image:
 
 
 def apply_dithering(image: Image, keypoints, apply_only_on_face=True) -> Image:
-    modified_image = image.convert('RGB').quantize(colors=16).convert('RGB')
+    modified_image = image.quantize(colors=16).convert('RGB')
 
     if apply_only_on_face:
         return swap_images_at_face_position(image, keypoints, modified_image)

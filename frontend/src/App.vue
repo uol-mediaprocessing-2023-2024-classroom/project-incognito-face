@@ -8,13 +8,16 @@
         :currentFilters="currentFilters"
         :currentAlgorithms="currentAlgorithms"
         :faceResult="faceResult"
+        :autoDetectionMode="autoDetectionMode"
         @loadImages="loadImages"
         @loadFilters="loadFilters"
         @selectImage="selectImage"
         @selectFilter="selectFilter"
+        @uploadImage="uploadImage"
         @applyFilter="applyFilter"
         @runFaceDetection="runFaceDetection"
         @resetGallery="resetGallery"
+        @toggleAutoDetectionMode="toggleAutoDetectionMode"
       />
     </v-main>
   </v-app>
@@ -38,6 +41,7 @@ export default {
       currentFilters: [],
       currentAlgorithms: [],
       faceResult: [],
+      autoDetectionMode: false,
       allImgData: [],
       limit: 60,
       loadedAmount: 0,
@@ -78,6 +82,36 @@ export default {
       await response.json();
     },
 
+    async toggleAutoDetectionMode() {
+      this.autoDetectionMode = !this.autoDetectionMode;
+    },
+
+    async uploadImage(file) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Encoded = e.target.result;
+        const requestBody = {
+          name: file.name,
+          timestamp: new Date().toISOString(),
+          base64: base64Encoded.split(",")[1],
+        };
+        const response = await fetch(this.backendHost + "/convert-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+        if (!response.ok) {
+          console.error("HTTP Error:", response.status, response.statusText);
+          return;
+        }
+        const newImage = await response.json();
+        this.currentGallery.push(newImage);
+      };
+      reader.readAsDataURL(file);
+    },
+
     async selectFilter(filter) {
       this.selectedFilter = filter;
     },
@@ -101,6 +135,9 @@ export default {
       });
       const jsonResponse = await response.json();
       this.selectedImage.base64 = jsonResponse.base64;
+      if (this.autoDetectionMode) {
+        await this.runFaceDetection(this.selectedImage);
+      }
     },
 
     async loadAlgorithms() {

@@ -32,8 +32,8 @@
             <button class="basicButton" @click="applyFilter(selectedImage)">
               Apply Filter
             </button>
-            <button class="basicButton" @click="runFaceDetection(selectedImage)">
-              Run Face Detection
+            <button class="basicButton" @click="handleDetectionButtonClick">
+              {{ detectionButtonText }}
             </button>
             <button class="basicButton" @click="downloadImage()">Download Image</button>
 
@@ -135,7 +135,16 @@
           </v-col>
         </v-row>
       </div>
-      <button class="loadMoreBtn" @click="$emit('loadMore')">Load more</button>
+      <button class="galleryBtn" @click="$emit('loadMore')">Load more</button>
+      <button class="galleryBtn" @click="$refs.fileInput.click()">Upload Image</button>
+      <input
+        class="fileInput"
+        type="file"
+        id="imageInput"
+        accept=".jpg,.png"
+        ref="fileInput"
+        @change="uploadFile"
+      />
     </div>
   </v-container>
 </template>
@@ -156,6 +165,7 @@ export default {
     currentFilters: Array,
     currentAlgorithms: Array,
     faceResult: Array,
+    autoDetectionMode: Boolean,
   },
 
   methods: {
@@ -174,8 +184,12 @@ export default {
     applyFilter(image) {
       this.$emit("applyFilter", image);
     },
-    runFaceDetection(image) {
-      this.$emit("runFaceDetection", image);
+    handleDetectionButtonClick(event) {
+      if (this.autoDetectionMode || event.shiftKey) {
+        this.$emit("toggleAutoDetectionMode");
+      } else if (!this.autoDetectionMode) {
+        this.$emit("runFaceDetection", this.selectedImage);
+      }
     },
     getFaceImage(name) {
       if (this.faceResult == null || this.faceResult.length <= 0) {
@@ -202,9 +216,20 @@ export default {
       link.click();
       URL.revokeObjectURL(link.href);
     },
+    uploadFile(event) {
+      const file = event.target.files[0];
+      if (file) {
+        this.$emit("uploadImage", file);
+      } else {
+        alert("No file selected!");
+      }
+    },
   },
 
   computed: {
+    detectionButtonText() {
+      return this.autoDetectionMode ? "Auto Face Detection" : "Run Face Detection";
+    },
     galleryImageNum() {
       return this.currentGallery.length;
     },
@@ -293,12 +318,16 @@ export default {
   width: 80px;
 }
 
-.loadMoreBtn {
+.fileInput {
+  display: none;
+}
+
+.galleryBtn {
   background-color: #a7a7a7;
   border-radius: 6px;
   padding-left: 5px;
   padding-right: 5px;
-  width: 100px;
+  width: 150px;
   align-self: center;
   margin-top: 10px;
 }
