@@ -8,6 +8,7 @@
         :currentFilters="currentFilters"
         :currentAlgorithms="currentAlgorithms"
         :faceResult="faceResult"
+        :faceRecognitionResult = "faceRecognitionResult"
         :autoDetectionMode="autoDetectionMode"
         @loadImages="loadImages"
         @loadFilters="loadFilters"
@@ -18,7 +19,7 @@
         @runFaceDetection="runFaceDetection"
         @resetGallery="resetGallery"
         @toggleAutoDetectionMode="toggleAutoDetectionMode"
-        @change_view="change_view"
+        @runFaceRecognition="runFaceRecognition"
       />
     </v-main>
   </v-app>
@@ -174,7 +175,6 @@ export default {
       });
       this.faceResult = await response.json();
     },
-
     async runFaceRecognition(image) {
       if (image == null) {
         return;
@@ -196,11 +196,6 @@ export default {
       });
       this.faceRecognitionResult = await response.json();
     },
-
-    change_view() {
-
-    },
-
     resetGallery() {
       this.selectedImage = require("@/assets/placeholder.json");
       this.currentGallery = [];

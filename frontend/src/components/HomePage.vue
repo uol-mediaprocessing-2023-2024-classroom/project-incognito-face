@@ -35,9 +35,10 @@
             <button class="basicButton" @click="applyFilter(selectedImage)">
               Apply Filter
             </button>
-            <button class="basicButton" @click="handleDetectionButtonClick">
+            <button v-if="this.selectedFaceDetection" class="basicButton" @click="handleDetectionButtonClick">
               {{ detectionButtonText }}
             </button>
+            <button v-else class="basicButton" @click="handleRecognitionButtonClick">Run Face Recognition</button>
             <button class="basicButton" @click="downloadImage()">Download Image</button>
 
             <div>
@@ -111,24 +112,23 @@
             </tr>
           </tbody>
           <tbody v-else>
-            <tr v-for="algorithm in currentAlgorithms" :key="algorithm.name">
+            <tr>
               <td class="resultTable">
                 <img
                   class="resultImg"
                   :src="
-                    getFaceImage(algorithm.name)
-                      ? getFaceImage(algorithm.name).base64
+                    getFaceRecognitionImage()
+                      ? getFaceRecognitionImage().base64
                       : ''
                   "
                 />
               </td>
               <td class="resultTable">
                 <div>
-                  <h3>{{ algorithm.displayName }}<br /></h3>
                   <p>
                     {{
-                      getFaceImage(algorithm.name)
-                        ? getFaceImage(algorithm.name).metadata
+                      getFaceRecognitionImage()
+                        ? getFaceRecognitionImage().metadata
                         : ""
                     }}
                   </p>
@@ -201,6 +201,7 @@ export default {
     currentFilters: Array,
     currentAlgorithms: Array,
     faceResult: Array,
+    faceRecognitionResult: Array,
     autoDetectionMode: Boolean,
   },
 
@@ -231,11 +232,20 @@ export default {
         this.$emit("runFaceDetection", this.selectedImage);
       }
     },
+    handleRecognitionButtonClick() {
+      this.$emit("runFaceRecognition", this.selectedImage);
+    },
     getFaceImage(name) {
       if (this.faceResult == null || this.faceResult.length <= 0) {
         return "";
       }
       return this.faceResult.find((obj) => obj.name === name);
+    },
+    getFaceRecognitionImage() {
+      if (this.faceRecognitionResult == null || this.faceRecognitionResult.length <= 0) {
+        return "";
+      }
+      return this.faceRecognitionResult;
     },
     downloadImage() {
       const base64 = this.selectedImage.base64.split(",")[1];
