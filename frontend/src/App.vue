@@ -36,6 +36,7 @@ export default {
 
   data() {
     return {
+      selectedFaceDetection: true,
       selectedImage: null,
       selectedFilter: null,
       currentGallery: [],

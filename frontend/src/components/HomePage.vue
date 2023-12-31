@@ -84,7 +84,33 @@
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody v-if="this.selectedFaceDetection">
+            <tr v-for="algorithm in currentAlgorithms" :key="algorithm.name">
+              <td class="resultTable">
+                <img
+                  class="resultImg"
+                  :src="
+                    getFaceImage(algorithm.name)
+                      ? getFaceImage(algorithm.name).base64
+                      : ''
+                  "
+                />
+              </td>
+              <td class="resultTable">
+                <div>
+                  <h3>{{ algorithm.displayName }}<br /></h3>
+                  <p>
+                    {{
+                      getFaceImage(algorithm.name)
+                        ? getFaceImage(algorithm.name).metadata
+                        : ""
+                    }}
+                  </p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-else>
             <tr v-for="algorithm in currentAlgorithms" :key="algorithm.name">
               <td class="resultTable">
                 <img
@@ -162,6 +188,12 @@ export default {
     this.loadImages();
   },
 
+   data() {
+    return {
+      selectedFaceDetection: true
+    };
+   },
+
   props: {
     selectedImage: Object,
     selectedFilter: Object,
@@ -175,6 +207,7 @@ export default {
   methods: {
     change_view() {
       this.$emit("change_view");
+      this.selectedFaceDetection = !this.selectedFaceDetection
     },
     loadImages() {
       this.$emit("loadImages");
@@ -339,6 +372,11 @@ export default {
   width: 150px;
   align-self: center;
   margin-top: 10px;
+}
+
+.disabled {
+  opacity: 0;
+  pointer-events: none;
 }
 
 #toggle {
