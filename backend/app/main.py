@@ -320,7 +320,7 @@ def threaded_keypoints(img_hash: str, image: Image):
         box = [face.left(), face.top(), face.width(), face.height()]
         face_keypoints = calculate_face_keypoints(all_landmarks)
         face_shape_landmarks = calculate_face_shape_landmarks(all_landmarks)
-        face_encodings = calculate_face_encodings(np.asarray(image))
+        _, face_encodings = calculate_face_encodings(np.asarray(image))
         box_and_keypoints_list.append((box, face_keypoints, face_shape_landmarks, face_encodings))
     with lock:
         cache[img_hash] = box_and_keypoints_list
@@ -408,16 +408,17 @@ def process_algorithm(algorithm, img):
 def process_face_recognition(img):
     img = Image.open(BytesIO(base64.b64decode(img[22:])))
     try:
-        img = recognize_faces_hog_svm(img, get_keypoints(img, True, None))
+        img, metadata = recognize_faces_hog_svm(img, get_keypoints(img, True, None))
     except Exception as e:
         print(f'An error occurred while trying to run face recognition: {e}')
         traceback.print_exc()
+        metadata = ''
     img_bytes_io = BytesIO()
     img.save(img_bytes_io, format='PNG')
     return {
         'name': 'Face Recognition',
         'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}',
-        'metadata': 'TODO'
+        'metadata': f'{metadata}'
     }
 
 
@@ -776,22 +777,29 @@ def highlight_face_ssd(img: Image):
 
 # TODO: Zurückgeben, ob Person erkannt wurde
 def recognize_faces_hog_svm(img: Image, keypoints):
-    unknown_face_locations, unknown_face_encodings = calculate_face_encodings(img)
+    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
-    face_encodings_orig = convert_face_enc_array(keypoints[3])
+    unknown_face_locations, unknown_face_encodings = calculate_face_encodings(np.asarray(img))
+
+    face_encodings_orig_list = []
+    for (_, _, _, face_encoding_orig) in keypoints:
+        face_encodings_orig_list.append(face_encoding_orig)
+
+    face_encodings_orig = convert_face_enc_array(face_encodings_orig_list)
     unknown_face_encodings = convert_face_enc_array(unknown_face_encodings)
 
     for unknown_face_location, unknown_face_encoding in zip(unknown_face_locations, unknown_face_encodings):
         matches = face_recognition.compare_faces(face_encodings_orig, unknown_face_encoding)
 
+        # TODO: Hier könnte noch ein Fehler sein / .any() muss eigentlich weg
         for match in matches:
-            if match:
+            if match.any():
                 top, right, bottom, left = unknown_face_location[0], unknown_face_location[1], unknown_face_location[2], \
                 unknown_face_location[3]
                 cv2.rectangle(img, (left, top), (right, bottom), (255, 255, 0), 6)
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(img_rgb)
+    return Image.fromarray(img_rgb), 'TODO'
 
 
 def convert_face_enc_array(face_encodings):

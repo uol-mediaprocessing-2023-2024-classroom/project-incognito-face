@@ -118,7 +118,7 @@
                   class="resultImg"
                   :src="
                     getFaceRecognitionImage()
-                      ? getFaceRecognitionImage().base64
+                      ? getFaceRecognitionImage()[0].base64
                       : ''
                   "
                 />
@@ -128,7 +128,7 @@
                   <p>
                     {{
                       getFaceRecognitionImage()
-                        ? getFaceRecognitionImage().metadata
+                        ? getFaceRecognitionImage()[0].metadata
                         : ""
                     }}
                   </p>
