@@ -26,6 +26,7 @@
 
 <script>
 import HomePage from "./components/HomePage";
+import loading from "@/assets/loading.json";
 
 export default {
   name: "App",
@@ -43,6 +44,7 @@ export default {
       currentFilters: [],
       currentAlgorithms: [],
       faceResult: [],
+      faceRecognitionResult: [],
       autoDetectionMode: false,
       allImgData: [],
       limit: 60,
@@ -171,6 +173,28 @@ export default {
         body: JSON.stringify(requestBody),
       });
       this.faceResult = await response.json();
+    },
+
+    async runFaceRecognition(image) {
+      if (image == null) {
+        return;
+      }
+      const loading = require("@/assets/loading.json");
+      this.faceRecognitionResult = {
+        base64: loading.base64
+      };
+      const requestBody = {
+        base64: image.base64,
+        hash: image.hash,
+      };
+      const response = await fetch(this.backendHost + "/run-face-recognition", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+      this.faceRecognitionResult = await response.json();
     },
 
     change_view() {

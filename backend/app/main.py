@@ -254,6 +254,20 @@ async def run_face_detection(data: RunFaceDetectionRequestData):
     return JSONResponse(content=result)
 
 
+@app.post('/run-face-recognition')
+async def run_face_recognition(data: RunFaceDetectionRequestData):
+    result = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(process_face_recognition, data.base64)]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                result.append(future.result())
+            except Exception as e:
+                print(f'An error occurred while trying to run multi-threaded face detection: {e}')
+    return JSONResponse(content=result)
+
+
+
 class GenerateKeypointsData(BaseModel):
     base64: str
     hash: str
@@ -382,13 +396,28 @@ def process_algorithm(algorithm, img):
         print(f'An error occurred while trying to run algorithm {algorithm.name}: {e}')
         traceback.print_exc()
         number_of_faces = 0
-        confidence = 0
     img_bytes_io = BytesIO()
     img.save(img_bytes_io, format='PNG')
     return {
         'name': algorithm['name'],
         'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}',
         'metadata': f'Number of faces: {number_of_faces}'
+    }
+
+
+def process_face_recognition(img):
+    img = Image.open(BytesIO(base64.b64decode(img[22:])))
+    try:
+        img = recognize_faces_hog_svm(img, get_keypoints(img, True, None))
+    except Exception as e:
+        print(f'An error occurred while trying to run face recognition: {e}')
+        traceback.print_exc()
+    img_bytes_io = BytesIO()
+    img.save(img_bytes_io, format='PNG')
+    return {
+        'name': 'Face Recognition',
+        'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}',
+        'metadata': 'TODO'
     }
 
 
@@ -745,6 +774,7 @@ def highlight_face_ssd(img: Image):
     return Image.fromarray(img_rgb), number_of_faces, confidence
 
 
+# TODO: Zurückgeben, ob Person erkannt wurde
 def recognize_faces_hog_svm(img: Image, keypoints):
     unknown_face_locations, unknown_face_encodings = calculate_face_encodings(img)
 
@@ -759,6 +789,9 @@ def recognize_faces_hog_svm(img: Image, keypoints):
                 top, right, bottom, left = unknown_face_location[0], unknown_face_location[1], unknown_face_location[2], \
                 unknown_face_location[3]
                 cv2.rectangle(img, (left, top), (right, bottom), (255, 255, 0), 6)
+
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(img_rgb)
 
 
 def convert_face_enc_array(face_encodings):
