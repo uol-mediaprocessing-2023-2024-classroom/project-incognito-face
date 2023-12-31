@@ -1,5 +1,8 @@
 <template>
   <v-container>
+    <div id="toggle">
+       <Toggle @change_view="change_view" />
+    </div>
     <div class="selectedImageField">
       <div class="selectedImageContainer">
         <div class="selectedImageInfo">
@@ -150,6 +153,7 @@
 </template>
 
 <script>
+import Toggle from './Toggle.vue';
 export default {
   name: "HomePage",
 
@@ -169,6 +173,9 @@ export default {
   },
 
   methods: {
+    change_view() {
+      this.$emit("change_view");
+    },
     loadImages() {
       this.$emit("loadImages");
     },
@@ -225,7 +232,9 @@ export default {
       }
     },
   },
-
+  components: {
+    Toggle,
+  },
   computed: {
     detectionButtonText() {
       return this.autoDetectionMode ? "Auto Face Detection" : "Run Face Detection";
@@ -331,4 +340,12 @@ export default {
   align-self: center;
   margin-top: 10px;
 }
+
+#toggle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
 </style>

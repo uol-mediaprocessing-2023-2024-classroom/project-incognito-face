@@ -18,6 +18,7 @@
         @runFaceDetection="runFaceDetection"
         @resetGallery="resetGallery"
         @toggleAutoDetectionMode="toggleAutoDetectionMode"
+        @change_view="change_view"
       />
     </v-main>
   </v-app>
@@ -169,6 +170,10 @@ export default {
         body: JSON.stringify(requestBody),
       });
       this.faceResult = await response.json();
+    },
+
+    change_view() {
+
     },
 
     resetGallery() {
