@@ -180,9 +180,9 @@ export default {
         return;
       }
       const loading = require("@/assets/loading.json");
-      this.faceRecognitionResult = {
+      this.faceRecognitionResult = [{
         base64: loading.base64
-      };
+      }];
       const requestBody = {
         base64: image.base64,
         hash: image.hash,
