@@ -778,39 +778,22 @@ def highlight_face_ssd(img: Image):
 def recognize_faces_hog_svm(img: Image, keypoints):
     img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
-    face_encodings_orig_list = []
-    unknown_face_locations = []
-    unknown_face_encodings = []
-    for box, _, _, face_encoding_orig in keypoints:
-        unknown_face_locations.append((box[1], box[0] + box[2], box[1] + box[3], box[0]))
-        unknown_face_encodings.append(calculate_face_encoding(np.asarray(img), box))
-        face_encodings_orig_list.append(face_encoding_orig)
-
-    face_encodings_orig = convert_face_enc_array(face_encodings_orig_list)
-    unknown_face_encodings = convert_face_enc_array(unknown_face_encodings)
-
     number_recog = 0
+    for box, _, _, face_encoding_orig in keypoints:
 
-    for unknown_face_location, unknown_face_encoding in zip(unknown_face_locations, unknown_face_encodings):
+        face_encoding_orig = [np.array(face_encoding_orig)]
+        face_encoding_unknown = np.array(calculate_face_encoding(np.asarray(img), box))
 
-        matches = face_recognition.compare_faces(face_encodings_orig, unknown_face_encoding)
+        matches = face_recognition.compare_faces(face_encoding_orig, face_encoding_unknown)
 
         if any(matches):
-            top, right, bottom, left = unknown_face_location[0], unknown_face_location[1], unknown_face_location[2], \
-            unknown_face_location[3]
+            top, right, bottom, left = box[1], box[0] + box[2], box[1] + box[3], box[0]
             cv2.rectangle(img, (left, top), (right, bottom), (255, 255, 0), 6)
             number_recog += 1
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     face_str = 'face was' if number_recog == 1 else 'faces were'
     return Image.fromarray(img_rgb),  f'{number_recog} {face_str} recognized'
-
-
-def convert_face_enc_array(face_encodings):
-    face_encodings_array = []
-    for face_encoding in face_encodings:
-        face_encodings_array.append(np.array(face_encoding))
-    return face_encodings_array
 
 
 # Global exception handler that catches all exceptions not handled by specific exception handlers.
