@@ -127,16 +127,6 @@ def home():
     return {'Test': 'Online'}
 
 
-@app.get('/get-images')
-async def get_images():
-    image_data_list = []
-    image_files = list(IMAGE_PATH.glob('*.jpg')) + list(IMAGE_PATH.glob('*.png'))
-    for img_path in image_files:
-        image_data = get_image_data(img_path)
-        image_data_list.append(image_data)
-    return JSONResponse(content=image_data_list)
-
-
 def get_image_data(img_path):
     with Image.open(img_path) as img:
         if img.mode != 'RGB':
@@ -155,7 +145,6 @@ def get_image_data(img_path):
 
 class ConvertImageRequestData(BaseModel):
     name: str
-    timestamp: str
     base64: str
 
 
@@ -173,7 +162,6 @@ async def convert_image(data: ConvertImageRequestData):
         
         result = {
             'name': data.name,
-            'timestamp': data.timestamp,
             'base64': f'data:image/png;base64,{base64_encoded}',
             'hash': get_image_hash(base64_encoded)
         }

@@ -1,20 +1,21 @@
 <template>
   <v-container>
     <div id="toggle">
-       <Toggle @change_view="change_view" />
+       <Toggle @changeView="changeView" />
     </div>
     <div class="selectedImageField">
       <div class="selectedImageContainer">
-        <div class="selectedImageInfo">
-          <h2>Selected Image: <br /></h2>
-        </div>
         <div style="display: flex">
-          <img
-            class="selectedImg"
-            v-bind:src="selectedImage ? selectedImage.base64 : ''"
-          />
+          <div v-if="this.selectedFaceDetection" class="selectedImageDisplay">
+            <ImageWithButton class="defaultImage" @uploadImage="uploadImage" @resetImage="resetImage" header="Original Image" :isOriginal=true :selectedImage="originalImage" />
+            <ImageWithButton :class="{ 'hideImage': modifiedImage === null, 'defaultImage': modifiedImage !== null }"
+                             @uploadImage="uploadImage" @resetImage="resetImage" header="Modified Image" :isOriginal=false :selectedImage="modifiedImage"/>
+          </div>
+          <div v-else class="selectedImageDisplay">
+            <ImageWithButton class="defaultImage" @uploadImage="uploadImage" @resetImage="resetImage" header="Original Image" :isOriginal=true :selectedImage="originalImage" />
+            <ImageWithButton class="defaultImage" @uploadImage="uploadImage" @resetImage="resetImage" header="Modified Image" :isOriginal=false :selectedImage="modifiedImage"/>
+          </div>
           <div class="inputField">
-            <button class="basicButton" @click="loadImages()">Reload Images</button>
             <v-menu offset-y>
               <template v-slot:activator="{ on }">
                 <v-btn v-on="on" class="basicDropdown">
@@ -32,7 +33,7 @@
                 </v-list-item>
               </v-list>
             </v-menu>
-            <button class="basicButton" @click="applyFilter(selectedImage)">
+            <button class="basicButton" @click="applyFilter(modifiedImage)">
               Apply Filter
             </button>
             <button v-if="this.selectedFaceDetection" class="basicButton" @click="handleDetectionButtonClick">
@@ -40,32 +41,6 @@
             </button>
             <button v-else class="basicButton" @click="handleRecognitionButtonClick">Run Face Recognition</button>
             <button class="basicButton" @click="downloadImage()">Download Image</button>
-
-            <div>
-              <h3>Image Info:<br /></h3>
-              <p>
-                {{
-                  selectedImage && selectedImage.name ? "Name: " + selectedImage.name : ""
-                }}
-              </p>
-              <p>
-                {{
-                  selectedImage && selectedImage.timestamp > 0
-                    ? "Date: " +
-                      new Date(selectedImage.timestamp * 1000).toLocaleString("de-DE", {
-                        hour12: false,
-                      })
-                    : ""
-                }}
-              </p>
-              <p>
-                {{
-                  selectedImage && selectedImage.hash
-                    ? "Hash: " + selectedImage.hash.slice(0, 15) + "..."
-                    : ""
-                }}
-              </p>
-            </div>
           </div>
         </div>
       </div>
@@ -90,11 +65,7 @@
               <td class="resultTable">
                 <img
                   class="resultImg"
-                  :src="
-                    getFaceImage(algorithm.name)
-                      ? getFaceImage(algorithm.name).base64
-                      : ''
-                  "
+                  :src="getFaceImage(algorithm.name)? getFaceImage(algorithm.name).base64: ''"
                 />
               </td>
               <td class="resultTable">
@@ -139,85 +110,44 @@
         </table>
       </div>
     </div>
-
-    <div class="imageGalleryField">
-      <div>
-        <v-row>
-          <v-col v-for="n in galleryImageNum" :key="n" class="d-flex child-flex" cols="2">
-            <v-img
-              :src="currentGallery[n - 1].base64"
-              aspect-ratio="1"
-              max-height="200"
-              max-width="200"
-              class="grey lighten-2"
-              @click="selectImage(currentGallery[n - 1])"
-            >
-              <template v-slot:placeholder>
-                <v-row class="fill-height ma-0" align="center" justify="center">
-                  <v-progress-circular
-                    indeterminate
-                    color="grey lighten-5"
-                  ></v-progress-circular>
-                </v-row>
-              </template>
-            </v-img>
-          </v-col>
-        </v-row>
-      </div>
-      <button class="galleryBtn" @click="$emit('loadMore')">Load more</button>
-      <button class="galleryBtn" @click="$refs.fileInput.click()">Upload Image</button>
-      <input
-        class="fileInput"
-        type="file"
-        id="imageInput"
-        accept=".jpg,.png"
-        ref="fileInput"
-        @change="uploadFile"
-      />
-    </div>
   </v-container>
 </template>
 
 <script>
 import Toggle from './Toggle.vue';
+import ImageWithButton from "./ImageWithButton.vue";
+
 export default {
   name: "HomePage",
 
   created() {
     this.loadFilters();
-    this.loadImages();
   },
 
-   data() {
-    return {
-      selectedFaceDetection: true
-    };
-   },
-
   props: {
-    selectedImage: Object,
+    selectedFaceDetection: Boolean,
     selectedFilter: Object,
-    currentGallery: Array,
+    originalImage: Object,
+    modifiedImage: Object,
     currentFilters: Array,
     currentAlgorithms: Array,
+    autoDetectionMode: Boolean,
     faceResult: Array,
     faceRecognitionResult: Array,
-    autoDetectionMode: Boolean,
   },
 
   methods: {
-    change_view() {
-      this.$emit("change_view");
-      this.selectedFaceDetection = !this.selectedFaceDetection
+    changeView() {
+      this.$emit("changeView");
     },
-    loadImages() {
-      this.$emit("loadImages");
+    uploadImage(file, isOriginal) {
+      this.$emit("uploadImage", file, isOriginal, this.selectedFaceDetection);
+    },
+    resetImage(isOriginal) {
+      this.$emit("resetImage", isOriginal, this.selectedFaceDetection);
     },
     loadFilters() {
       this.$emit("loadFilters");
-    },
-    selectImage(image) {
-      this.$emit("selectImage", image);
     },
     selectFilter(filter) {
       this.$emit("selectFilter", filter);
@@ -229,11 +159,11 @@ export default {
       if (this.autoDetectionMode || event.shiftKey) {
         this.$emit("toggleAutoDetectionMode");
       } else if (!this.autoDetectionMode) {
-        this.$emit("runFaceDetection", this.selectedImage);
+        this.$emit("runFaceDetection", this.modifiedImage);
       }
     },
     handleRecognitionButtonClick() {
-      this.$emit("runFaceRecognition", this.selectedImage);
+      this.$emit("runFaceRecognition", this.modifiedImage);
     },
     getFaceImage(name) {
       if (this.faceResult == null || this.faceResult.length <= 0) {
@@ -248,8 +178,8 @@ export default {
       return this.faceRecognitionResult;
     },
     downloadImage() {
-      const base64 = this.selectedImage.base64.split(",")[1];
-      const contentType = this.selectedImage.base64
+      const base64 = this.modifiedImage.base64.split(",")[1];
+      const contentType = this.modifiedImage.base64
         .split(",")[0]
         .split(":")[1]
         .split(";")[0];
@@ -262,28 +192,18 @@ export default {
       const blob = new Blob([byteArray], { type: contentType });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = this.selectedImage.name;
+      link.download = this.modifiedImage.name;
       link.click();
       URL.revokeObjectURL(link.href);
     },
-    uploadFile(event) {
-      const file = event.target.files[0];
-      if (file) {
-        this.$emit("uploadImage", file);
-      } else {
-        alert("No file selected!");
-      }
-    },
   },
   components: {
+    ImageWithButton,
     Toggle,
   },
   computed: {
     detectionButtonText() {
       return this.autoDetectionMode ? "Auto Face Detection" : "Run Face Detection";
-    },
-    galleryImageNum() {
-      return this.currentGallery.length;
     },
   },
 };
@@ -300,26 +220,16 @@ export default {
   padding: 1%;
 }
 
-.imageGalleryField {
-  display: flex;
+.selectedImageDisplay {
   flex-direction: column;
-  background-color: rgb(249, 251, 255);
-  border-radius: 10px;
-  box-shadow: 0 10px 10px 10px rgba(0, 0, 0, 0.1);
-  color: black;
-  padding: 1%;
-  margin-top: 1%;
-  max-height: 600px;
-  overflow-y: auto;
 }
 
-.selectedImg {
-  max-width: 500px;
-  max-height: 500px;
+.defaultImage {
+
 }
 
-.selectedImageInfo {
-  margin-left: 10px;
+.hideImage {
+  display: none;
 }
 
 .resultImg {
@@ -349,12 +259,6 @@ export default {
   box-shadow: none !important;
 }
 
-.idInput {
-  margin-right: 8px;
-  border: 1px solid #000;
-  border-radius: 3px;
-}
-
 .inputField {
   display: flex;
   flex-direction: column;
@@ -364,29 +268,6 @@ export default {
 
 .inputField * {
   margin: 5px 0px 5px 0px;
-}
-
-.inputTable {
-  width: 80px;
-}
-
-.fileInput {
-  display: none;
-}
-
-.galleryBtn {
-  background-color: #a7a7a7;
-  border-radius: 6px;
-  padding-left: 5px;
-  padding-right: 5px;
-  width: 150px;
-  align-self: center;
-  margin-top: 10px;
-}
-
-.disabled {
-  opacity: 0;
-  pointer-events: none;
 }
 
 #toggle {

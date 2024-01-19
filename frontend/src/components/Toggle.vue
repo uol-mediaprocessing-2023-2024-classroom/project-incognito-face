@@ -25,7 +25,7 @@ export default {
   methods: {
     toggleColor(buttonNumber) {
       if (this.isPressed !== buttonNumber)
-        this.$emit("change_view");
+        this.$emit("changeView");
       this.isPressed = buttonNumber;
     },
   },

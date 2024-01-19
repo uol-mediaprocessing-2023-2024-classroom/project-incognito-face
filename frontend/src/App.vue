@@ -2,23 +2,23 @@
   <v-app>
     <v-main>
       <HomePage
-        :selectedImage="selectedImage"
+        :selectedFaceDetection="selectedFaceDetection"
         :selectedFilter="selectedFilter"
-        :currentGallery="currentGallery"
+        :originalImage="originalImage"
+        :modifiedImage="modifiedImage"
         :currentFilters="currentFilters"
         :currentAlgorithms="currentAlgorithms"
         :faceResult="faceResult"
         :faceRecognitionResult = "faceRecognitionResult"
         :autoDetectionMode="autoDetectionMode"
-        @loadImages="loadImages"
+        @changeView="changeView"
+        @resetImage="resetImage"
         @loadFilters="loadFilters"
-        @selectImage="selectImage"
         @selectFilter="selectFilter"
         @uploadImage="uploadImage"
         @applyFilter="applyFilter"
-        @runFaceDetection="runFaceDetection"
-        @resetGallery="resetGallery"
         @toggleAutoDetectionMode="toggleAutoDetectionMode"
+        @runFaceDetection="runFaceDetection"
         @runFaceRecognition="runFaceRecognition"
       />
     </v-main>
@@ -39,29 +39,45 @@ export default {
   data() {
     return {
       selectedFaceDetection: true,
-      selectedImage: null,
       selectedFilter: null,
-      currentGallery: [],
+      originalImage: null,
+      modifiedImage: null,
       currentFilters: [],
       currentAlgorithms: [],
       faceResult: [],
-      faceRecognitionResult: [],
+      faceRecognitionResult: [], //TODO: Vlt. noch später entfernen?
       autoDetectionMode: false,
-      allImgData: [],
       limit: 60,
       loadedAmount: 0,
       backendHost: "http://127.0.0.1:8000",
     };
   },
 
-  mounted() {
-    this.selectedImage = require("@/assets/placeholder.json");
-  },
-
   methods: {
-    async loadImages() {
-      const response = await fetch(this.backendHost + "/get-images");
-      this.currentGallery = await response.json();
+    async changeView() {
+      this.selectedFaceDetection = !this.selectedFaceDetection;
+      this.originalImage = null;
+      this.modifiedImage = null;
+      this.faceResult = [];
+      this.faceRecognitionResult = [];
+    },
+
+    async resetImage(isOriginal, selectedFaceDetection) {
+      if (selectedFaceDetection) {
+          if (isOriginal) {
+            this.originalImage = null;
+            this.modifiedImage = null;
+          }
+          else {
+            this.modifiedImage = JSON.parse(JSON.stringify(this.originalImage))
+          }
+        }
+        else if (isOriginal) {
+          this.originalImage = null;
+        }
+        else {
+          this.modifiedImage = null;
+        }
     },
 
     async loadFilters() {
@@ -69,37 +85,20 @@ export default {
       this.currentFilters = await response.json();
     },
 
-    async selectImage(image) {
-      // Deepcopy to keep the gallery intact
-      this.selectedImage = JSON.parse(JSON.stringify(image));
-
-      const requestBody = {
-        base64: image.base64,
-        hash: image.hash,
-      };
-      const response = await fetch(this.backendHost + "/generate-keypoints", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-      await response.json();
-    },
-
     async toggleAutoDetectionMode() {
       this.autoDetectionMode = !this.autoDetectionMode;
     },
 
-    async uploadImage(file) {
+    async uploadImage(file, isOriginal, selectedFaceDetection) {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const base64Encoded = e.target.result;
+
         const requestBody = {
           name: file.name,
-          timestamp: new Date().toISOString(),
           base64: base64Encoded.split(",")[1],
         };
+
         const response = await fetch(this.backendHost + "/convert-image", {
           method: "POST",
           headers: {
@@ -107,12 +106,36 @@ export default {
           },
           body: JSON.stringify(requestBody),
         });
+
         if (!response.ok) {
           console.error("HTTP Error:", response.status, response.statusText);
           return;
         }
+
         const newImage = await response.json();
-        this.currentGallery.push(newImage);
+        if (selectedFaceDetection) {
+          this.originalImage = newImage;
+          this.modifiedImage = JSON.parse(JSON.stringify(newImage));
+        }
+        else if (isOriginal) {
+          this.originalImage = newImage;
+        }
+        else {
+          this.modifiedImage = newImage;
+        }
+
+        const requestBody2 = {
+          base64: newImage.base64,
+          hash: newImage.hash,
+        };
+        const response2 = await fetch(this.backendHost + "/generate-keypoints", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody2),
+        });
+        await response2.json();
       };
       reader.readAsDataURL(file);
     },
@@ -139,9 +162,9 @@ export default {
         body: JSON.stringify(requestBody),
       });
       const jsonResponse = await response.json();
-      this.selectedImage.base64 = jsonResponse.base64;
+      this.modifiedImage.base64 = jsonResponse.base64;
       if (this.autoDetectionMode) {
-        await this.runFaceDetection(this.selectedImage);
+        await this.runFaceDetection(this.modifiedImage);
       }
     },
 
@@ -175,6 +198,7 @@ export default {
       });
       this.faceResult = await response.json();
     },
+
     async runFaceRecognition(image) {
       if (image == null) {
         return;
@@ -195,11 +219,6 @@ export default {
         body: JSON.stringify(requestBody),
       });
       this.faceRecognitionResult = await response.json();
-    },
-    resetGallery() {
-      this.selectedImage = require("@/assets/placeholder.json");
-      this.currentGallery = [];
-      this.faceResult = [];
     },
   },
 };
