@@ -225,7 +225,6 @@ async def apply_filter(data: ApplyFilterRequestData):
 
 class RunFaceDetectionRequestData(BaseModel):
     base64: str
-    hash: str
 
 
 @app.post('/run-face-detection')
@@ -242,11 +241,17 @@ async def run_face_detection(data: RunFaceDetectionRequestData):
     return JSONResponse(content=result)
 
 
+class RunFaceRecognitionRequestData(BaseModel):
+    orig_hash: str
+    orig_base64: str
+    mod_base64: str
+
+
 @app.post('/run-face-recognition')
-async def run_face_recognition(data: RunFaceDetectionRequestData):
+async def run_face_recognition(data: RunFaceRecognitionRequestData):
     result = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(process_face_recognition, data.base64, data.hash)]
+        futures = [executor.submit(process_face_recognition, data.orig_hash, data.orig_base64, data.mod_base64)]
         for future in concurrent.futures.as_completed(futures):
             try:
                 result.append(future.result())
@@ -300,7 +305,8 @@ def get_keypoints(image: Image, wait_for_result=False, img_hash=None):
 
 
 def threaded_keypoints(img_hash: str, image: Image):
-    gray_image = cv2.cvtColor(np.asarray(image), cv2.COLOR_BGR2GRAY)
+    img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = hog_svm_detector(gray_image)
     box_and_keypoints_list = []
     for face in faces:
@@ -308,7 +314,7 @@ def threaded_keypoints(img_hash: str, image: Image):
         box = [face.left(), face.top(), face.width(), face.height()]
         face_keypoints = calculate_face_keypoints(all_landmarks)
         face_shape_landmarks = calculate_face_shape_landmarks(all_landmarks)
-        face_encoding = calculate_face_encoding(np.asarray(image), box)
+        face_encoding = calculate_face_encoding(np.asarray(img), box)
         box_and_keypoints_list.append((box, face_keypoints, face_shape_landmarks, face_encoding))
     with lock:
         cache[img_hash] = box_and_keypoints_list
@@ -393,10 +399,11 @@ def process_algorithm(algorithm, img):
     }
 
 
-def process_face_recognition(img, img_hash):
-    img = Image.open(BytesIO(base64.b64decode(img[22:])))
+def process_face_recognition(orig_hash, orig_base64, mod_base64):
+    mod_img = Image.open(BytesIO(base64.b64decode(mod_base64[22:])))
+    orig_img = Image.open(BytesIO(base64.b64decode(orig_base64[22:])))
     try:
-        img, metadata = recognize_faces_hog_svm(img, get_keypoints(img, True, img_hash))
+        img, metadata = recognize_faces_hog_svm(orig_img, mod_img, get_keypoints(orig_img, True, orig_hash))
     except Exception as e:
         print(f'An error occurred while trying to run face recognition: {e}')
         traceback.print_exc()
@@ -763,23 +770,37 @@ def highlight_face_ssd(img: Image):
     return Image.fromarray(img_rgb), number_of_faces, confidence
 
 
-def recognize_faces_hog_svm(img: Image, keypoints):
-    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+def recognize_faces_hog_svm(orig_img: Image, mod_img: Image, orig_keypoints):
+
+    orig_img_bgr = cv2.cvtColor(np.array(orig_img), cv2.COLOR_RGB2BGR)
+    mod_img_bgr = cv2.cvtColor(np.array(mod_img), cv2.COLOR_RGB2BGR)
+
+    gray_image = cv2.cvtColor(np.asarray(mod_img_bgr), cv2.COLOR_BGR2GRAY)
+    faces = hog_svm_detector(gray_image)
+    face_encodings_unknown = []
+    for face in faces:
+        box = [face.left(), face.top(), face.width(), face.height()]
+        face_encodings_unknown.append(np.array(calculate_face_encoding(np.asarray(mod_img_bgr), box)))
 
     number_recog = 0
-    for box, _, _, face_encoding_orig in keypoints:
 
-        face_encoding_orig = [np.array(face_encoding_orig)]
-        face_encoding_unknown = np.array(calculate_face_encoding(np.asarray(img), box))
+    face_encodings_orig = []
+    boxes_orig = []
+    for box, _, _, face_encoding_orig in orig_keypoints:
+        face_encodings_orig.append(np.array(face_encoding_orig))
+        boxes_orig.append(box)
 
-        matches = face_recognition.compare_faces(face_encoding_orig, face_encoding_unknown)
+    for face_encoding_unknown in face_encodings_unknown:
+        matches = face_recognition.compare_faces(face_encodings_orig, face_encoding_unknown)
 
-        if any(matches):
-            top, right, bottom, left = box[1], box[0] + box[2], box[1] + box[3], box[0]
-            cv2.rectangle(img, (left, top), (right, bottom), (255, 255, 0), 6)
-            number_recog += 1
+        for i, match in enumerate(matches):
+            if match:
+                box = boxes_orig[i]
+                top, right, bottom, left = box[1], box[0] + box[2], box[1] + box[3], box[0]
+                cv2.rectangle(orig_img_bgr, (left, top), (right, bottom), (255, 255, 0), 6)
+                number_recog += 1
 
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img_rgb = cv2.cvtColor(orig_img_bgr, cv2.COLOR_BGR2RGB)
     face_str = 'face was' if number_recog == 1 else 'faces were'
     return Image.fromarray(img_rgb),  f'{number_recog} {face_str} recognized'
 

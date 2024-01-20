@@ -163,7 +163,7 @@ export default {
       }
     },
     handleRecognitionButtonClick() {
-      this.$emit("runFaceRecognition", this.modifiedImage);
+      this.$emit("runFaceRecognition", this.originalImage, this.modifiedImage);
     },
     getFaceImage(name) {
       if (this.faceResult == null || this.faceResult.length <= 0) {

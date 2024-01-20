@@ -189,7 +189,6 @@ export default {
       }));
       const requestBody = {
         base64: image.base64,
-        hash: image.hash,
       };
       const response = await fetch(this.backendHost + "/run-face-detection", {
         method: "POST",
@@ -201,8 +200,8 @@ export default {
       this.faceResult = await response.json();
     },
 
-    async runFaceRecognition(image) {
-      if (image == null) {
+    async runFaceRecognition(orig_image, mod_image) {
+      if (orig_image == null || mod_image == null) {
         return;
       }
       const loading = require("@/assets/loading.json");
@@ -210,8 +209,9 @@ export default {
         base64: loading.base64
       }];
       const requestBody = {
-        base64: image.base64,
-        hash: image.hash,
+        orig_hash: orig_image.hash,
+        orig_base64: orig_image.base64,
+        mod_base64: mod_image.base64,
       };
       const response = await fetch(this.backendHost + "/run-face-recognition", {
         method: "POST",
