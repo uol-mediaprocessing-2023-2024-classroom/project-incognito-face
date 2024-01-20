@@ -6,10 +6,11 @@
         :selectedFilter="selectedFilter"
         :originalImage="originalImage"
         :modifiedImage="modifiedImage"
+        :originalImageOutputFR="originalImageOutputFR"
+        :modifiedImageOutputFR="modifiedImageOutputFR"
         :currentFilters="currentFilters"
         :currentAlgorithms="currentAlgorithms"
         :faceResult="faceResult"
-        :faceRecognitionResult = "faceRecognitionResult"
         :autoDetectionMode="autoDetectionMode"
         @changeView="changeView"
         @resetImage="resetImage"
@@ -42,10 +43,11 @@ export default {
       selectedFilter: null,
       originalImage: null,
       modifiedImage: null,
+      originalImageOutputFR: null,
+      modifiedImageOutputFR: null,
       currentFilters: [],
       currentAlgorithms: [],
       faceResult: [],
-      faceRecognitionResult: [], //TODO: Vlt. noch später entfernen?
       autoDetectionMode: false,
       limit: 60,
       loadedAmount: 0,
@@ -58,8 +60,9 @@ export default {
       this.selectedFaceDetection = !this.selectedFaceDetection;
       this.originalImage = null;
       this.modifiedImage = null;
+      this.originalImageOutputFR = null;
+      this.modifiedImageOutputFR = null;
       this.faceResult = [];
-      this.faceRecognitionResult = [];
       this.currentAlgorithms = null;
       this.selectedFilter = null;
     },
@@ -205,9 +208,10 @@ export default {
         return;
       }
       const loading = require("@/assets/loading.json");
-      this.faceRecognitionResult = [{
-        base64: loading.base64
-      }];
+      this.originalImageOutputFR = JSON.parse(JSON.stringify(orig_image));
+      this.modifiedImageOutputFR = JSON.parse(JSON.stringify(mod_image));
+      this.originalImageOutputFR.base64 = loading.base64;
+      this.modifiedImageOutputFR.base64 = loading.base64;
       const requestBody = {
         orig_hash: orig_image.hash,
         orig_base64: orig_image.base64,
@@ -220,7 +224,10 @@ export default {
         },
         body: JSON.stringify(requestBody),
       });
-      this.faceRecognitionResult = await response.json();
+      const jsonResponse = await response.json();
+
+      this.originalImageOutputFR.base64 = jsonResponse.orig_base64;
+      this.modifiedImageOutputFR.base64 = jsonResponse.mod_base64;
     },
   },
 };

@@ -3,7 +3,8 @@
     <div class="selectedImageInfo">
           <h2>{{header}} <br /></h2>
     </div>
-    <button @click="resetImage()"
+
+    <button v-if="!this.isResult" @click="resetImage()"
           :class="{ 'resetButtonBeforeUpload': selectedImage === null, 'resetButtonAfterUpload': selectedImage !== null }">
       <i style="font-size:24px" class="fa">&#xf021;</i>
       </button>
@@ -29,6 +30,7 @@
 export default {
   props: {
     isOriginal: Boolean,
+    isResult: Boolean,
     header: String,
     selectedImage: Object,
   },

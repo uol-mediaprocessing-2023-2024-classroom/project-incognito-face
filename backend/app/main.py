@@ -24,6 +24,8 @@ from pathlib import Path
 from io import BytesIO
 import cv2
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 app = FastAPI()
 IMAGE_PATH = Path(__file__).parent.parent.parent / 'images'
@@ -159,7 +161,7 @@ async def convert_image(data: ConvertImageRequestData):
                 img.save(buffer, format='PNG')
                 buffer.seek(0)
                 base64_encoded = base64.b64encode(buffer.read()).decode("utf-8")
-        
+
         result = {
             'name': data.name,
             'base64': f'data:image/png;base64,{base64_encoded}',
@@ -254,11 +256,10 @@ async def run_face_recognition(data: RunFaceRecognitionRequestData):
         futures = [executor.submit(process_face_recognition, data.orig_hash, data.orig_base64, data.mod_base64)]
         for future in concurrent.futures.as_completed(futures):
             try:
-                result.append(future.result())
+                result = future.result()
             except Exception as e:
-                print(f'An error occurred while trying to run multi-threaded face detection: {e}')
+                print(f'An error occurred while trying to run multi-threaded face recognition: {e}')
     return JSONResponse(content=result)
-
 
 
 class GenerateKeypointsData(BaseModel):
@@ -400,20 +401,20 @@ def process_algorithm(algorithm, img):
 
 
 def process_face_recognition(orig_hash, orig_base64, mod_base64):
-    mod_img = Image.open(BytesIO(base64.b64decode(mod_base64[22:])))
     orig_img = Image.open(BytesIO(base64.b64decode(orig_base64[22:])))
+    mod_img = Image.open(BytesIO(base64.b64decode(mod_base64[22:])))
     try:
-        img, metadata = recognize_faces_hog_svm(orig_img, mod_img, get_keypoints(orig_img, True, orig_hash))
+        orig_img, mod_img = recognize_faces_hog_svm(orig_img, mod_img, get_keypoints(orig_img, True, orig_hash))
     except Exception as e:
         print(f'An error occurred while trying to run face recognition: {e}')
         traceback.print_exc()
-        metadata = ''
-    img_bytes_io = BytesIO()
-    img.save(img_bytes_io, format='PNG')
+    orig_img_bytes_io = BytesIO()
+    orig_img.save(orig_img_bytes_io, format='PNG')
+    mod_img_bytes_io = BytesIO()
+    mod_img.save(mod_img_bytes_io, format='PNG')
     return {
-        'name': 'Face Recognition',
-        'base64': f'data:image/png;base64,{base64.b64encode(img_bytes_io.getvalue()).decode("utf-8")}',
-        'metadata': f'{metadata}'
+        'orig_base64': f'data:image/png;base64,{base64.b64encode(orig_img_bytes_io.getvalue()).decode("utf-8")}',
+        'mod_base64': f'data:image/png;base64,{base64.b64encode(mod_img_bytes_io.getvalue()).decode("utf-8")}'
     }
 
 
@@ -771,18 +772,17 @@ def highlight_face_ssd(img: Image):
 
 
 def recognize_faces_hog_svm(orig_img: Image, mod_img: Image, orig_keypoints):
-
     orig_img_bgr = cv2.cvtColor(np.array(orig_img), cv2.COLOR_RGB2BGR)
     mod_img_bgr = cv2.cvtColor(np.array(mod_img), cv2.COLOR_RGB2BGR)
 
     gray_image = cv2.cvtColor(np.asarray(mod_img_bgr), cv2.COLOR_BGR2GRAY)
     faces = hog_svm_detector(gray_image)
     face_encodings_unknown = []
+    boxes_mod = []
     for face in faces:
         box = [face.left(), face.top(), face.width(), face.height()]
         face_encodings_unknown.append(np.array(calculate_face_encoding(np.asarray(mod_img_bgr), box)))
-
-    number_recog = 0
+        boxes_mod.append((face.left(), face.top(), face.width(), face.height()))
 
     face_encodings_orig = []
     boxes_orig = []
@@ -790,19 +790,24 @@ def recognize_faces_hog_svm(orig_img: Image, mod_img: Image, orig_keypoints):
         face_encodings_orig.append(np.array(face_encoding_orig))
         boxes_orig.append(box)
 
-    for face_encoding_unknown in face_encodings_unknown:
+    for j, face_encoding_unknown in enumerate(face_encodings_unknown):
         matches = face_recognition.compare_faces(face_encodings_orig, face_encoding_unknown)
 
         for i, match in enumerate(matches):
             if match:
-                box = boxes_orig[i]
-                top, right, bottom, left = box[1], box[0] + box[2], box[1] + box[3], box[0]
-                cv2.rectangle(orig_img_bgr, (left, top), (right, bottom), (255, 255, 0), 6)
-                number_recog += 1
+                selected_color = palette[(j * 2) % num_colors]
+                bgr_color = tuple(int(value * 255) for value in selected_color)
+                box_orig = boxes_orig[i]
+                box_mod = boxes_mod[j]
+                top, right, bottom, left = box_orig[1], box_orig[0] + box_orig[2], box_orig[1] + box_orig[3], box_orig[0]
+                cv2.rectangle(orig_img_bgr, (left, top), (right, bottom), bgr_color, 6)
 
-    img_rgb = cv2.cvtColor(orig_img_bgr, cv2.COLOR_BGR2RGB)
-    face_str = 'face was' if number_recog == 1 else 'faces were'
-    return Image.fromarray(img_rgb),  f'{number_recog} {face_str} recognized'
+                top, right, bottom, left = box_mod[1], box_mod[0] + box_mod[2], box_mod[1] + box_mod[3], box_mod[0]
+                cv2.rectangle(mod_img_bgr, (left, top), (right, bottom), bgr_color, 6)
+
+    orig_img_rgb = cv2.cvtColor(orig_img_bgr, cv2.COLOR_BGR2RGB)
+    mod_img_rgb = cv2.cvtColor(mod_img_bgr, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(orig_img_rgb), Image.fromarray(mod_img_rgb)
 
 
 # Global exception handler that catches all exceptions not handled by specific exception handlers.
@@ -825,6 +830,9 @@ ssd_detector = cv2.dnn.readNetFromCaffe("resources/deploy.prototxt",
 # Load shape predictors
 hog_svm_shape_predictor = dlib.shape_predictor('resources/shape_predictor_68_face_landmarks.dat')
 
+num_colors = 11
+
+palette = sns.color_palette("husl", n_colors=num_colors)
 
 # auxiliary methods
 def apply_alpha_to_transparent_image(foreground: Image, alpha_of_masks: int) -> Image:
