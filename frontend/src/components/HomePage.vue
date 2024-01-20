@@ -45,7 +45,8 @@
         </div>
       </div>
       <div>
-        <table>
+
+        <table v-if="this.selectedFaceDetection">
           <thead>
             <tr>
               <th class="resultTable">
@@ -60,7 +61,7 @@
               </th>
             </tr>
           </thead>
-          <tbody v-if="this.selectedFaceDetection">
+          <tbody>
             <tr v-for="algorithm in currentAlgorithms" :key="algorithm.name">
               <td class="resultTable">
                 <img
@@ -82,32 +83,13 @@
               </td>
             </tr>
           </tbody>
-          <tbody v-else>
-            <tr>
-              <td class="resultTable">
-                <img
-                  class="resultImg"
-                  :src="
-                    getFaceRecognitionImage()
-                      ? getFaceRecognitionImage()[0].base64
-                      : ''
-                  "
-                />
-              </td>
-              <td class="resultTable">
-                <div>
-                  <p class="centeredBoldText">
-                    {{
-                      getFaceRecognitionImage()
-                        ? getFaceRecognitionImage()[0].metadata
-                        : ""
-                    }}
-                  </p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
         </table>
+        <div v-else>
+          <ImageWithButton :class="{ 'hideImage': originalImageOutputFR === null, 'defaultImage': originalImageOutputFR !== null }" @uploadImage="uploadImage"
+                           @resetImage="resetImage" header="Original Image" :isOriginal=true :isResult=true :selectedImage="originalImageOutputFR" />
+          <ImageWithButton :class="{ 'hideImage': modifiedImageOutputFR === null, 'defaultImage': modifiedImageOutputFR !== null }" @uploadImage="uploadImage"
+                           @resetImage="resetImage" header="Recognized Faces (same colors)" :isOriginal=false :isResult=true :selectedImage="modifiedImageOutputFR"/>
+        </div>
       </div>
     </div>
   </v-container>
@@ -129,11 +111,12 @@ export default {
     selectedFilter: Object,
     originalImage: Object,
     modifiedImage: Object,
+    originalImageOutputFR: Object,
+    modifiedImageOutputFR: Object,
     currentFilters: Array,
     currentAlgorithms: Array,
     autoDetectionMode: Boolean,
     faceResult: Array,
-    faceRecognitionResult: Array,
   },
 
   methods: {
@@ -170,12 +153,6 @@ export default {
         return "";
       }
       return this.faceResult.find((obj) => obj.name === name);
-    },
-    getFaceRecognitionImage() {
-      if (this.faceRecognitionResult == null || this.faceRecognitionResult.length <= 0) {
-        return "";
-      }
-      return this.faceRecognitionResult;
     },
     downloadImage() {
       const base64 = this.modifiedImage.base64.split(",")[1];
