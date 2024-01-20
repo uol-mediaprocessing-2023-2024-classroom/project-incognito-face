@@ -70,8 +70,8 @@
               </td>
               <td class="resultTable">
                 <div>
-                  <h3>{{ algorithm.displayName }}<br /></h3>
-                  <p>
+                  <h3 class="centeredText">{{ algorithm.displayName }}<br /></h3>
+                  <p class="centeredText">
                     {{
                       getFaceImage(algorithm.name)
                         ? getFaceImage(algorithm.name).metadata
@@ -96,7 +96,7 @@
               </td>
               <td class="resultTable">
                 <div>
-                  <p>
+                  <p class="centeredBoldText">
                     {{
                       getFaceRecognitionImage()
                         ? getFaceRecognitionImage()[0].metadata
@@ -220,7 +220,12 @@ export default {
   padding: 1%;
 }
 
+.selectedImageContainer {
+   margin-right: 10px;
+}
+
 .selectedImageDisplay {
+  display: flex;
   flex-direction: column;
 }
 
@@ -233,8 +238,8 @@ export default {
 }
 
 .resultImg {
-  max-width: 150px;
-  max-height: 150px;
+  max-width: 100%;
+  max-height:  100%;
 }
 
 .resultTable {
@@ -261,9 +266,20 @@ export default {
 
 .inputField {
   display: flex;
+  align-items: center;
+  justify-content: center;
   flex-direction: column;
   margin-left: 10px;
   width: 200px;
+}
+
+.centeredText {
+  text-align: center;
+}
+
+.centeredBoldText {
+  text-align: center;
+  font-weight: 450;
 }
 
 .inputField * {

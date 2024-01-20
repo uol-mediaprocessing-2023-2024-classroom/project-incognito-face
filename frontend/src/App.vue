@@ -60,6 +60,8 @@ export default {
       this.modifiedImage = null;
       this.faceResult = [];
       this.faceRecognitionResult = [];
+      this.currentAlgorithms = null;
+      this.selectedFilter = null;
     },
 
     async resetImage(isOriginal, selectedFaceDetection) {

@@ -80,11 +80,12 @@ export default {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: rgb(204, 203, 205);
+  //background-color: rgb(204, 203, 205);
+  background-color: green;
   padding: 0px 4px 0px 4px;
   margin-right: 5px;
-  border-radius: 3px;
-  width: 220px;
+  border-radius: 12px;
+  width: 140px;
   height: 60px
 }
 
@@ -106,9 +107,7 @@ export default {
   height: 40px;
 }
 
-
 .fileInput {
   display: none;
 }
-
 </style>
