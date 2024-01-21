@@ -791,7 +791,7 @@ def recognize_faces_hog_svm(orig_img: Image, mod_img: Image, orig_keypoints):
         boxes_orig.append(box)
 
     for j, face_encoding_unknown in enumerate(face_encodings_unknown):
-        matches = face_recognition.compare_faces(face_encodings_orig, face_encoding_unknown)
+        matches = face_recognition.compare_faces(face_encodings_orig, face_encoding_unknown, tolerance=0.5)
 
         for i, match in enumerate(matches):
             if match:
