@@ -14,6 +14,7 @@
         :autoDetectionMode="autoDetectionMode"
         @changeView="changeView"
         @resetImage="resetImage"
+        @deleteImage="deleteImage"
         @loadFilters="loadFilters"
         @selectFilter="selectFilter"
         @uploadImage="uploadImage"
@@ -42,7 +43,9 @@ export default {
       selectedFaceDetection: true,
       selectedFilter: null,
       originalImage: null,
+      originalImageCopy: null,
       modifiedImage: null,
+      modifiedImageCopy: null,
       originalImageOutputFR: null,
       modifiedImageOutputFR: null,
       currentFilters: [],
@@ -67,22 +70,29 @@ export default {
       this.selectedFilter = null;
     },
 
-    async resetImage(isOriginal, selectedFaceDetection) {
+    async resetImage(isOriginal) {
+      if (isOriginal) {
+        this.originalImage = JSON.parse(JSON.stringify(this.originalImageCopy));
+      }
+      else {
+        this.modifiedImage = JSON.parse(JSON.stringify(this.modifiedImageCopy));
+      }
+    },
+    async deleteImage(isOriginal, selectedFaceDetection) {
       if (selectedFaceDetection) {
-          if (isOriginal) {
-            this.originalImage = null;
-            this.modifiedImage = null;
-          }
-          else {
-            this.modifiedImage = JSON.parse(JSON.stringify(this.originalImage))
-          }
-        }
-        else if (isOriginal) {
-          this.originalImage = null;
-        }
-        else {
-          this.modifiedImage = null;
-        }
+        this.originalImage = null;
+        this.originalImageCopy = null;
+        this.modifiedImage = null;
+        this.modifiedImageCopy = null;
+      }
+      else if (isOriginal) {
+        this.originalImage = null;
+        this.originalImageCopy = null;
+      }
+      else {
+        this.modifiedImage = null;
+        this.modifiedImageCopy = null;
+      }
     },
 
     async loadFilters() {
@@ -121,12 +131,16 @@ export default {
         if (selectedFaceDetection) {
           this.originalImage = newImage;
           this.modifiedImage = JSON.parse(JSON.stringify(newImage));
+          this.originalImageCopy = JSON.parse(JSON.stringify(newImage));
+          this.modifiedImageCopy = JSON.parse(JSON.stringify(newImage));
         }
         else if (isOriginal) {
           this.originalImage = newImage;
+          this.originalImageCopy = JSON.parse(JSON.stringify(newImage));
         }
         else {
           this.modifiedImage = newImage;
+          this.modifiedImageCopy = JSON.parse(JSON.stringify(newImage));
         }
 
         const requestBody2 = {

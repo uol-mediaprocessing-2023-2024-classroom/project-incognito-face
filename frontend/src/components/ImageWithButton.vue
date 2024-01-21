@@ -5,14 +5,25 @@
     </div>
 
     <button v-if="!this.isResult" @click="resetImage()"
-          :class="{ 'resetButtonBeforeUpload': selectedImage === null, 'resetButtonAfterUpload': selectedImage !== null }">
+            class="resetButton"
+          :class="{ 'buttonHide': selectedImage === null || isOriginal}">
       <i style="font-size:24px" class="fa">&#xf021;</i>
-      </button>
+    </button>
+    <button v-if="!this.isResult" @click="deleteImage()"
+            class="deleteButton"
+          :class="{ 'buttonHide': selectedImage === null}">
+      <i style="font-size:24px" class="fa">&#xf021;</i>
+    </button>
+    <button v-if="!this.isResult" @click="downloadImage()"
+            class="downloadButton"
+          :class="{ 'buttonHide': selectedImage === null  || isOriginal}">
+      <i style="font-size:24px" class="fa">&#xf021;</i>
+    </button>
 
     <img v-bind:src="selectedImage ? selectedImage.base64 : require('@/assets/placeholder.json').base64" alt="Your Image"
          :class="{ 'resultImg': isResult, 'selectedImgBeforeUpload': selectedImage === null, 'selectedImgAfterUpload': selectedImage !== null }" />
     <button @click="$refs.fileInput.click()"
-          :class="{ 'basicButtonBeforeUpload': selectedImage === null, 'basicButtonAfterUpload': selectedImage !== null }"> Upload Image </button>
+          :class="{ 'basicButtonBeforeUpload': selectedImage === null, 'buttonHide': selectedImage !== null }"> Upload Image </button>
     <input
         class="fileInput"
         type="file"
@@ -49,6 +60,12 @@ export default {
     resetImage() {
       this.$emit("resetImage", this.isOriginal);
     },
+    deleteImage() {
+      this.$emit("deleteImage", this.isOriginal);
+    },
+    downloadImage() {
+      this.$emit("downloadImage", this.selectedImage);
+    }
   },
 };
 </script>
@@ -96,19 +113,33 @@ export default {
   height: 60px
 }
 
-.basicButtonAfterUpload {
+.buttonHide {
   display: none;
 }
 
-.resetButtonBeforeUpload {
-  display: none;
-}
-
-.resetButtonAfterUpload {
+.resetButton {
   position: absolute;
   background-color: rgb(204, 203, 205);
-  padding: 0px 4px 0px 4px;
   margin-right: 5px;
+  border-radius: 3px;
+  width: 40px;
+  height: 40px;
+}
+
+.deleteButton {
+  position: absolute;
+  background-color: rgb(204, 203, 205);
+  right: 0px;
+  border-radius: 3px;
+  width: 40px;
+  height: 40px;
+}
+
+.downloadButton {
+  position: absolute;
+  background-color: rgb(204, 203, 205);
+  right: 0px;
+  bottom: 7px;
   border-radius: 3px;
   width: 40px;
   height: 40px;

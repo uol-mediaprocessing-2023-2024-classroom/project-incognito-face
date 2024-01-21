@@ -7,13 +7,20 @@
       <div class="selectedImageContainer">
         <div style="display: flex">
           <div v-if="this.selectedFaceDetection" class="selectedImageDisplay">
-            <ImageWithButton class="defaultImage" @uploadImage="uploadImage" @resetImage="resetImage" header="Original Image" :isOriginal=true :selectedImage="originalImage" />
+            <ImageWithButton class="defaultImage"
+                             @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
+                             header="Original Image" :isOriginal=true :selectedImage="originalImage" />
             <ImageWithButton :class="{ 'hideImage': modifiedImage === null, 'defaultImage': modifiedImage !== null }"
-                             @uploadImage="uploadImage" @resetImage="resetImage" header="Modified Image" :isOriginal=false :selectedImage="modifiedImage"/>
+                             @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
+                             header="Modified Image" :isOriginal=false :selectedImage="modifiedImage"/>
           </div>
           <div v-else class="selectedImageDisplay">
-            <ImageWithButton class="defaultImage" @uploadImage="uploadImage" @resetImage="resetImage" header="Original Image" :isOriginal=true :selectedImage="originalImage" />
-            <ImageWithButton class="defaultImage" @uploadImage="uploadImage" @resetImage="resetImage" header="Modified Image" :isOriginal=false :selectedImage="modifiedImage"/>
+            <ImageWithButton class="defaultImage"
+                             @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
+                             header="Original Image" :isOriginal=true :selectedImage="originalImage" />
+            <ImageWithButton class="defaultImage"
+                             @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
+                             header="Modified Image" :isOriginal=false :selectedImage="modifiedImage"/>
           </div>
           <div class="inputField">
             <v-menu offset-y>
@@ -40,7 +47,6 @@
               {{ detectionButtonText }}
             </button>
             <button v-else class="basicButton" @click="handleRecognitionButtonClick">Run Face Recognition</button>
-            <button class="basicButton" @click="downloadImage()">Download Image</button>
           </div>
         </div>
       </div>
@@ -84,11 +90,13 @@
           </tbody>
         </table>
         <div v-else>
-          <ImageWithButton :class="{ 'hideImage': originalImageOutputFR === null, 'defaultImage': originalImageOutputFR !== null }" @uploadImage="uploadImage"
-                           @resetImage="resetImage" header="Original Image" :isOriginal=true :isResult=true :selectedImage="originalImageOutputFR" />
+          <ImageWithButton :class="{ 'hideImage': originalImageOutputFR === null, 'defaultImage': originalImageOutputFR !== null }"
+                           @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
+                           header="Original Image" :isOriginal=true :isResult=true :selectedImage="originalImageOutputFR" />
 
-          <ImageWithButton :class="{ 'hideImage': modifiedImageOutputFR === null, 'defaultImage': modifiedImageOutputFR !== null }" @uploadImage="uploadImage"
-                           @resetImage="resetImage" header="Recognized Faces (same colors)" :isOriginal=false :isResult=true :selectedImage="modifiedImageOutputFR"/>
+          <ImageWithButton :class="{ 'hideImage': modifiedImageOutputFR === null, 'defaultImage': modifiedImageOutputFR !== null }"
+                           @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
+                           header="Recognized Faces (same colors)" :isOriginal=false :isResult=true :selectedImage="modifiedImageOutputFR"/>
         </div>
       </div>
     </div>
@@ -123,12 +131,36 @@ export default {
     changeView() {
       this.$emit("changeView");
     },
+
     uploadImage(file, isOriginal) {
       this.$emit("uploadImage", file, isOriginal, this.selectedFaceDetection);
     },
     resetImage(isOriginal) {
-      this.$emit("resetImage", isOriginal, this.selectedFaceDetection);
+      this.$emit("resetImage", isOriginal);
     },
+    deleteImage(isOriginal) {
+      this.$emit("deleteImage", isOriginal, this.selectedFaceDetection);
+    },
+    downloadImage(image) {
+      const base64 = image.base64.split(",")[1];
+      const contentType = image.base64
+        .split(",")[0]
+        .split(":")[1]
+        .split(";")[0];
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: contentType });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = image.name;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    },
+
     loadFilters() {
       this.$emit("loadFilters");
     },
@@ -153,25 +185,6 @@ export default {
         return "";
       }
       return this.faceResult.find((obj) => obj.name === name);
-    },
-    downloadImage() {
-      const base64 = this.modifiedImage.base64.split(",")[1];
-      const contentType = this.modifiedImage.base64
-        .split(",")[0]
-        .split(":")[1]
-        .split(";")[0];
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: contentType });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = this.modifiedImage.name;
-      link.click();
-      URL.revokeObjectURL(link.href);
     },
   },
   components: {
