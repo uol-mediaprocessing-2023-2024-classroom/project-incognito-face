@@ -3,7 +3,7 @@
     <div class="selectedImageInfo">
           <h2>{{header}} <br /></h2>
     </div>
-
+    <div class="positionedParent">
     <button v-if="!this.isResult" @click="resetImage()"
             class="resetButton"
           :class="{ 'buttonHide': selectedImage === null || isOriginal}">
@@ -33,7 +33,7 @@
         @click="resetUploadFile"
         @input="uploadFile"
       />
-
+      </div>
   </div>
 </template>
 
@@ -76,10 +76,18 @@ export default {
 .selectedImageInfo {
   margin-left: 10px;
 }
-
+/*position: relative; */
+/* display: inline-block; */
 .image-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+}
+
+.positionedParent {
   position: relative;
-  display: inline-block;
 }
 
 .selectedImgBeforeUpload {
@@ -101,13 +109,9 @@ export default {
 
 .basicButtonBeforeUpload {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   //background-color: rgb(204, 203, 205);
   background-color: green;
   padding: 0px 4px 0px 4px;
-  margin-right: 5px;
   border-radius: 12px;
   width: 140px;
   height: 60px
@@ -129,17 +133,16 @@ export default {
 .deleteButton {
   position: absolute;
   background-color: rgb(204, 203, 205);
-  right: 0px;
   border-radius: 3px;
   width: 40px;
   height: 40px;
+  top: 0; /* Position the button at the top of the container */
+  right: 0; /* Position the button at the right of the container */
 }
 
 .downloadButton {
   position: absolute;
   background-color: rgb(204, 203, 205);
-  right: 0px;
-  bottom: 7px;
   border-radius: 3px;
   width: 40px;
   height: 40px;

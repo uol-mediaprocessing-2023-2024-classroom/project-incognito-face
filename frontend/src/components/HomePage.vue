@@ -90,13 +90,15 @@
           </tbody>
         </table>
         <div v-else>
-          <ImageWithButton :class="{ 'hideImage': originalImageOutputFR === null, 'defaultImage': originalImageOutputFR !== null }"
+          <div class="frContainer">
+            <ImageWithButton :class="{ 'hideImage': originalImageOutputFR === null, 'defaultImage': originalImageOutputFR !== null }"
                            @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
                            header="Original Image" :isOriginal=true :isResult=true :selectedImage="originalImageOutputFR" />
 
-          <ImageWithButton :class="{ 'hideImage': modifiedImageOutputFR === null, 'defaultImage': modifiedImageOutputFR !== null }"
+            <ImageWithButton :class="{ 'hideImage': modifiedImageOutputFR === null, 'defaultImage': modifiedImageOutputFR !== null }"
                            @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
                            header="Recognized Faces (same colors)" :isOriginal=false :isResult=true :selectedImage="modifiedImageOutputFR"/>
+          </div>
         </div>
       </div>
     </div>
@@ -222,6 +224,13 @@ export default {
 .tableFDContainer {
   display: flex;
   flex: 1;
+}
+
+.frContainer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
 }
 
 .defaultImage {
