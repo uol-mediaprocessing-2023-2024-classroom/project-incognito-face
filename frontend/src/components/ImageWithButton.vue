@@ -10,7 +10,7 @@
       </button>
 
     <img v-bind:src="selectedImage ? selectedImage.base64 : require('@/assets/placeholder.json').base64" alt="Your Image"
-         :class="{ 'selectedImgBeforeUpload': selectedImage === null, 'selectedImgAfterUpload': selectedImage !== null }" />
+         :class="{ 'resultImg': isResult, 'selectedImgBeforeUpload': selectedImage === null, 'selectedImgAfterUpload': selectedImage !== null }" />
     <button @click="$refs.fileInput.click()"
           :class="{ 'basicButtonBeforeUpload': selectedImage === null, 'basicButtonAfterUpload': selectedImage !== null }"> Upload Image </button>
     <input
@@ -75,6 +75,11 @@ export default {
   max-width: 500px;
   max-height: 500px;
   opacity: 100%;
+}
+
+.resultImg {
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .basicButtonBeforeUpload {
