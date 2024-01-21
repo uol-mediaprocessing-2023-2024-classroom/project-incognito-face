@@ -12,12 +12,12 @@
     <button v-if="!this.isResult" @click="deleteImage()"
             class="deleteButton"
           :class="{ 'buttonHide': selectedImage === null}">
-      <i style="font-size:24px" class="fa">&#xf021;</i>
+      <i style="font-size:28px" class="fa fa-trash"></i>
     </button>
     <button v-if="!this.isResult" @click="downloadImage()"
             class="downloadButton"
           :class="{ 'buttonHide': selectedImage === null  || isOriginal}">
-      <i style="font-size:24px" class="fa">&#xf021;</i>
+      <i style="font-size:24px" class="fa fa-download"></i>
     </button>
 
     <img v-bind:src="selectedImage ? selectedImage.base64 : require('@/assets/placeholder.json').base64" alt="Your Image"
@@ -109,6 +109,9 @@ export default {
 
 .basicButtonBeforeUpload {
   position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   //background-color: rgb(204, 203, 205);
   background-color: green;
   padding: 0px 4px 0px 4px;
@@ -124,7 +127,6 @@ export default {
 .resetButton {
   position: absolute;
   background-color: rgb(204, 203, 205);
-  margin-right: 5px;
   border-radius: 3px;
   width: 40px;
   height: 40px;
@@ -136,8 +138,8 @@ export default {
   border-radius: 3px;
   width: 40px;
   height: 40px;
-  top: 0; /* Position the button at the top of the container */
-  right: 0; /* Position the button at the right of the container */
+  top: 0;
+  right: 0;
 }
 
 .downloadButton {
@@ -146,6 +148,8 @@ export default {
   border-radius: 3px;
   width: 40px;
   height: 40px;
+  bottom: 7px;
+  right: 0;
 }
 
 .fileInput {
