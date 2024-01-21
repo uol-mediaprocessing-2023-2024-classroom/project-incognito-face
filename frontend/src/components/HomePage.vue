@@ -44,7 +44,7 @@
           </div>
         </div>
       </div>
-      <div>
+      <div class="tableFDContainer">
 
         <table v-if="this.selectedFaceDetection">
           <thead>
@@ -204,6 +204,11 @@ export default {
 .selectedImageDisplay {
   display: flex;
   flex-direction: column;
+}
+
+.tableFDContainer {
+  display: flex;
+  flex: 1;
 }
 
 .defaultImage {
