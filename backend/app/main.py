@@ -26,6 +26,7 @@ import cv2
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy.ndimage import binary_dilation, binary_erosion
 
 app = FastAPI()
 IMAGE_PATH = Path(__file__).parent.parent.parent / 'images'
@@ -63,6 +64,14 @@ FILTERS = [
         'displayName': 'Quantize Colors'
     },
     {
+        'name': 'minFilter',
+        'displayName': 'Min Filter'
+    },
+    {
+        'name': 'maxFilter',
+        'displayName': 'Max Filter'
+    },
+    {
         'name': 'closing',
         'displayName': 'Closing'
     },
@@ -97,6 +106,18 @@ FILTERS = [
     {
         'name': 'hightlightKeypoints',
         'displayName': 'Highlight Keypoints'
+    },
+    {
+        'name': 'distanceTransformation',
+        'displayName': 'Distance Trans.'
+    },
+    {
+        'name': 'verticalEdge',
+        'displayName': 'Vertical Edge'
+    },
+    {
+        'name': 'horizontalEdge',
+        'displayName': 'Horizontal Edge'
     }
 ]
 
@@ -186,6 +207,7 @@ class ApplyFilterRequestData(BaseModel):
     filter: str
     base64: str
     hash: str
+    face_only: bool
 
 
 @app.post('/apply-filter')
@@ -195,13 +217,17 @@ async def apply_filter(data: ApplyFilterRequestData):
         keypoints = get_keypoints(img, True, data.hash)
         match data.filter:
             case 'blur':
-                img = apply_blur(img, keypoints)
+                img = apply_blur(img, keypoints, data.face_only)
             case 'dithering':
-                img = apply_dithering(img, keypoints)
+                img = apply_dithering(img, keypoints, data.face_only)
+            case 'minFilter':
+                img = apply_min_filter(img, keypoints, data.face_only)
+            case 'maxFilter':
+                img = apply_max_filter(img, keypoints, data.face_only)               
             case 'closing':
-                img = apply_closing(img, keypoints)
+                img = apply_closing(img, keypoints, data.face_only)
             case 'opening':
-                img = apply_opening(img, keypoints)
+                img = apply_opening(img, keypoints, data.face_only)
             case 'sunglasses':
                 img = apply_sunglasses(img, keypoints)
             case 'faceMask':
@@ -215,7 +241,13 @@ async def apply_filter(data: ApplyFilterRequestData):
             case 'hideWithMasks':
                 img = apply_hide_with_masks(img, keypoints)
             case 'hightlightKeypoints':
-                img = highlight_keypoints(img, keypoints)
+                img = apply_highlight_keypoints(img, keypoints)
+            case 'distanceTransformation':
+                img = apply_distance_transformation(img)
+            case 'verticalEdge':
+                img = apply_vertical_edge(img)
+            case 'horizontalEdge':
+                img = apply_horizontal_edge(img)
     except Exception as e:
         print(f'An error occurred while trying to run filter {data.filter}: {e}')
         traceback.print_exc()
@@ -418,78 +450,55 @@ def process_face_recognition(orig_hash, orig_base64, mod_base64):
     }
 
 
-def apply_blur(image: Image, keypoints, apply_only_on_face=True) -> Image:
+def apply_blur(image: Image, keypoints, only_face=True) -> Image:
     modified_image = image.filter(ImageFilter.BoxBlur(10))
-
-    if apply_only_on_face:
+    if only_face:
         return swap_images_at_face_position(image, keypoints, modified_image)
     else:
         return modified_image
 
 
-def apply_vertical_edge(image: Image) -> Image:
-    return image.filter(ImageFilter.Kernel((3, 3), (-1, 0, 1, -2, 0, 2, -1, 0, 1), 1, 0))
-
-
-def apply_horizontal_edge(image: Image) -> Image:
-    return image.filter(ImageFilter.Kernel((3, 3), (-1, -2, -1, 0, 0, 0, 1, 2, 1), 1, 0))
-
-
-def apply_dithering(image: Image, keypoints, apply_only_on_face=True) -> Image:
+def apply_dithering(image: Image, keypoints, only_face=True) -> Image:
     modified_image = image.quantize(colors=16).convert('RGB')
-
-    if apply_only_on_face:
+    if only_face:
         return swap_images_at_face_position(image, keypoints, modified_image)
     else:
         return modified_image
 
 
-def apply_max_filter(image: Image) -> Image:
-    return image.filter(ImageFilter.MaxFilter(9))
-
-
-def apply_min_filter(image: Image) -> Image:
-    return image.filter(ImageFilter.MinFilter(9))
-
-
-def apply_closing(image: Image, keypoints, apply_only_on_face=True) -> Image:
-    modified_image = apply_min_filter(apply_max_filter(image))
-
-    if apply_only_on_face:
+def apply_max_filter(image: Image, keypoints, only_face=True) -> Image:
+    modified_image = image.filter(ImageFilter.MaxFilter(9))
+    if only_face:
         return swap_images_at_face_position(image, keypoints, modified_image)
     else:
         return modified_image
 
 
-def apply_opening(image: Image, keypoints, apply_only_on_face=True) -> Image:
-    modified_image = apply_max_filter(apply_min_filter(image))
+def apply_min_filter(image: Image, keypoints, only_face=True) -> Image:
+    modified_image = image.filter(ImageFilter.MinFilter(9))
+    if only_face:
+        return swap_images_at_face_position(image, keypoints, modified_image)
+    else:
+        return modified_image
 
-    if apply_only_on_face:
+def apply_closing(image: Image, keypoints, only_face=True) -> Image:
+    modified_image = apply_min_filter(apply_max_filter(image, keypoints, False), keypoints, False)
+    if only_face:
         return swap_images_at_face_position(image, keypoints, modified_image)
     else:
         return modified_image
 
 
-def swap_images_at_face_position(image: Image, keypoints, image_to_swap: Image) -> Image:
-    # Create foreground
-    foreground_parts = Image.new('RGBA', image.size)
-
-    # Add cow pattern at face position
-    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
-        (minX, maxX), (minY, maxY), (width, height) = calculate_face_shape_landmarks_box_positions(face_shape_landmarks)
-        new_foreground_part = image_to_swap.crop((minX, minY, maxX, maxY))
-        new_foreground_part.putalpha(255)
-        foreground_parts.paste(new_foreground_part, (minX, minY), new_foreground_part)
-
-    # Create image from filters with mask
-    image = apply_filter_on_faces(image, keypoints, foreground_parts)
-
-    return image
+def apply_opening(image: Image, keypoints, only_face=True) -> Image:
+    modified_image = apply_max_filter(apply_min_filter(image, keypoints, False), keypoints, False)
+    if only_face:
+        return swap_images_at_face_position(image, keypoints, modified_image)
+    else:
+        return modified_image
 
 
-def apply_sunglasses(image: Image, keypoints, scale_factor: float = 2.5):
+def apply_sunglasses(image: Image, keypoints, scale_factor: float = 2.5) -> Image:
     foreground = Image.open('filters/sunglasses.png')
-
     for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         left_eye = face_keypoints['left_eye']
         right_eye = face_keypoints['right_eye']
@@ -498,29 +507,21 @@ def apply_sunglasses(image: Image, keypoints, scale_factor: float = 2.5):
         angle_radians = math.atan2(-dy, dx)
         angle_degrees = math.degrees(angle_radians)
         eye_distance = math.dist((right_eye[0], right_eye[1]), (left_eye[0], left_eye[1]))
-
         foreground_width_to_height_ratio = foreground.size[0] / foreground.size[1]
         foreground = foreground.resize(size=(
             int(scale_factor * eye_distance), int(scale_factor * eye_distance / foreground_width_to_height_ratio)))
-
         rotated_overlay = foreground.rotate(angle_degrees, expand=True)
-
         left_part = (scale_factor - 1) / 2
         left_upper_sunglasses = (int(left_eye[0] - eye_distance * left_part),
                                  int(left_eye[1] - eye_distance * left_part / foreground_width_to_height_ratio))
-
         left_upper_paste = (left_upper_sunglasses[0], int(left_upper_sunglasses[1] - math.fabs(
             math.cos(math.radians(90 - angle_degrees)) * scale_factor * eye_distance)))
-
         image.paste(rotated_overlay, left_upper_paste, rotated_overlay)
-
     return image
 
 
-# TODO: Change Position and scale of mask
-def apply_whole_face_mask(image: Image, keypoints):
+def apply_whole_face_mask(image: Image, keypoints) -> Image:
     foreground = Image.open('filters/whole_face_mask.png').convert("RGBA")
-
     for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         left_eye = face_keypoints['left_eye']
         right_eye = face_keypoints['right_eye']
@@ -529,25 +530,18 @@ def apply_whole_face_mask(image: Image, keypoints):
         angle_radians = math.atan2(-dy, dx)
         angle_degrees = math.degrees(angle_radians)
         face_width = box[2]
-
         foreground_width_to_height_ratio = foreground.size[0] / foreground.size[1]
         foreground = foreground.resize(size=(face_width, int(face_width / foreground_width_to_height_ratio)))
-
         rotated_overlay = foreground.rotate(angle_degrees, expand=True)
-
         left_upper_face_mask = (box[0], box[1])
-
         left_upper_paste = (left_upper_face_mask[0], int(left_upper_face_mask[1] - math.fabs(
             math.cos(math.radians(90 - angle_degrees)) * face_width)))
-
         image.paste(rotated_overlay, left_upper_paste, rotated_overlay)
-
     return image
 
 
-def apply_medicine_mask(image: Image, keypoints):
+def apply_medicine_mask(image: Image, keypoints) -> Image:
     foreground = Image.open('filters/medicine_mask.png').convert("RGBA")
-
     for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         left_mouth = face_keypoints['left_mouth']
         right_mouth = face_keypoints['right_mouth']
@@ -556,23 +550,61 @@ def apply_medicine_mask(image: Image, keypoints):
         angle_radians = math.atan2(-dy, dx)
         angle_degrees = math.degrees(angle_radians)
         face_width = box[2]
-
         foreground_width_to_height_ratio = foreground.size[0] / foreground.size[1]
         foreground = foreground.resize(size=(face_width, int(face_width / foreground_width_to_height_ratio)))
-
         rotated_overlay = foreground.rotate(angle_degrees, expand=True)
-
         left_upper_face_mask = (box[0], face_keypoints['nose'][1])
-
         left_upper_paste = (left_upper_face_mask[0], int(left_upper_face_mask[1] - math.fabs(
             math.cos(math.radians(90 - angle_degrees)) * face_width)))
-
         image.paste(rotated_overlay, left_upper_paste, rotated_overlay)
-
     return image
 
 
-def highlight_keypoints(image: Image, keypoints):
+def apply_cow_pattern(image: Image, keypoints, alpha_of_cow_pattern: int = 85) -> Image:
+    foreground = Image.open('../backend/filters/cow_pattern.png').convert("RGBA")
+    foreground_parts = Image.new('RGBA', image.size)
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
+        (minX, maxX), (minY, maxY), (width, height) = calculate_face_shape_landmarks_box_positions(face_shape_landmarks)
+        new_foreground_part = foreground.resize((width, height), resample=Image.LANCZOS)
+        foreground_parts.paste(new_foreground_part, (minX, minY), new_foreground_part)
+    foreground_parts.putalpha(alpha_of_cow_pattern)
+    image = apply_filter_on_faces(image, keypoints, foreground_parts)
+    return image
+
+
+def apply_salt_n_pepper(image: Image, keypoints, alpha_of_salt_n_pepper: int = 90) -> Image:
+    foreground_parts = Image.new('RGBA', image.size)
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
+        (minX, maxX), (minY, maxY), (width, height) = calculate_face_shape_landmarks_box_positions(face_shape_landmarks)
+        pixels = np.zeros(width * height, dtype=np.uint8)
+        pixels[:width * height // 2] = 255  # Set first half to white (value 255)
+        np.random.shuffle(pixels)
+        rgb_box = np.stack((pixels, pixels, pixels), axis=-1)
+        rgb_box_reshaped = np.reshape(rgb_box, (height, width, 3))
+        rgb_box_image = Image.fromarray(rgb_box_reshaped)
+        rgb_box_image.putalpha(255)
+        foreground_parts.paste(rgb_box_image, (minX, minY), rgb_box_image)
+    foreground_parts.putalpha(alpha_of_salt_n_pepper)
+    image = apply_filter_on_faces(image, keypoints, foreground_parts)
+    return image
+
+
+def apply_hide_with_masks(img: Image, keypoints, number_of_masks: int = 40,
+                          face_mask_width: int = 75, face_mask_height: int = 75,
+                          alpha_of_masks: int = 45) -> Image:
+    foreground = Image.open('../backend/filters/whole_face_mask.png').convert('RGBA')
+    foreground_alpha = apply_alpha_to_transparent_image(foreground, alpha_of_masks)
+    face_and_mask_coordinates = find_face_rectangles_mtcnn(keypoints)
+    mask_cords = find_free_coordinates_outside_of_rectangles(img, number_of_masks, face_mask_width, face_mask_height,
+                                                             face_and_mask_coordinates)
+    for mask_coords in mask_cords:
+        resized_foreground = foreground_alpha.resize((face_mask_width, face_mask_height), resample=Image.LANCZOS)
+        img.paste(resized_foreground, (mask_coords[0], mask_coords[1]), resized_foreground)
+
+    return img
+
+
+def apply_highlight_keypoints(image: Image, keypoints) -> Image:
     draw = ImageDraw.Draw(image)
     if len(keypoints) > 0:
         for keypoint_set in keypoints:
@@ -590,73 +622,21 @@ def highlight_keypoints(image: Image, keypoints):
     return image
 
 
-def apply_cow_pattern(image: Image, keypoints, alpha_of_cow_pattern: int = 85):
-    foreground = Image.open('../backend/filters/cow_pattern.png').convert("RGBA")
+def apply_distance_transformation(image: Image) -> Image:
+    image_np = np.array(image.convert('L'))
+    threshold = 128
+    binary_image = (image_np > threshold).astype(np.uint8)
+    dilated = binary_dilation(binary_image, iterations=5)
+    eroded = binary_erosion(binary_image, iterations=5)
+    morphed_image = np.where(dilated != eroded, 255, 0).astype(np.uint8)
+    return Image.fromarray(morphed_image)
 
-    # Create foreground from filter
-    foreground_parts = Image.new('RGBA', image.size)
-
-    # Add cow pattern at face position
-    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
-        (minX, maxX), (minY, maxY), (width, height) = calculate_face_shape_landmarks_box_positions(face_shape_landmarks)
-        new_foreground_part = foreground.resize((width, height), resample=Image.LANCZOS)
-        foreground_parts.paste(new_foreground_part, (minX, minY), new_foreground_part)
-
-    # Apply alpha
-    foreground_parts.putalpha(alpha_of_cow_pattern)
-
-    # Create image from filters with mask
-    image = apply_filter_on_faces(image, keypoints, foreground_parts)
-
-    return image
+def apply_vertical_edge(image: Image) -> Image:
+    return image.filter(ImageFilter.Kernel((3, 3), (-1, 0, 1, -2, 0, 2, -1, 0, 1), 1, 0))
 
 
-def apply_salt_n_pepper(image: Image, keypoints, alpha_of_salt_n_pepper: int = 90):
-    # Create foreground from filter
-    foreground_parts = Image.new('RGBA', image.size)
-
-    # Add salt_n_pepper at face position
-    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
-        (minX, maxX), (minY, maxY), (width, height) = calculate_face_shape_landmarks_box_positions(face_shape_landmarks)
-        pixels = np.zeros(width * height, dtype=np.uint8)
-        pixels[:width * height // 2] = 255  # Set first half to white (value 255)
-        np.random.shuffle(pixels)
-        rgb_box = np.stack((pixels, pixels, pixels), axis=-1)
-        rgb_box_reshaped = np.reshape(rgb_box, (height, width, 3))
-        rgb_box_image = Image.fromarray(rgb_box_reshaped)
-        rgb_box_image.putalpha(255)
-        foreground_parts.paste(rgb_box_image, (minX, minY), rgb_box_image)
-
-    # Apply alpha
-    foreground_parts.putalpha(alpha_of_salt_n_pepper)
-
-    # Apply the filter in shape of faces
-    image = apply_filter_on_faces(image, keypoints, foreground_parts)
-
-    return image
-
-
-# ToDo Values are hardcoded change with sliders later on
-def apply_hide_with_masks(img: Image, keypoints, number_of_masks: int = 40,
-                          face_mask_width: int = 75, face_mask_height: int = 75,
-                          alpha_of_masks: int = 45):
-    # Apply alpha to foreground (image must have transparent background so that this works)
-    foreground = Image.open('../backend/filters/whole_face_mask.png').convert('RGBA')
-    foreground_alpha = apply_alpha_to_transparent_image(foreground, alpha_of_masks)
-
-    # find coordinates of faces on image
-    face_and_mask_coordinates = find_face_rectangles_mtcnn(keypoints)
-
-    # find free coordinates for mask
-    mask_cords = find_free_coordinates_outside_of_rectangles(img, number_of_masks, face_mask_width, face_mask_height,
-                                                             face_and_mask_coordinates)
-
-    # insert masks on image
-    for mask_coords in mask_cords:
-        resized_foreground = foreground_alpha.resize((face_mask_width, face_mask_height), resample=Image.LANCZOS)
-        img.paste(resized_foreground, (mask_coords[0], mask_coords[1]), resized_foreground)
-
-    return img
+def apply_horizontal_edge(image: Image) -> Image:
+    return image.filter(ImageFilter.Kernel((3, 3), (-1, -2, -1, 0, 0, 0, 1, 2, 1), 1, 0))
 
 
 def calculate_face_shape_landmarks_box_positions(face_shape_landmarks):
@@ -669,27 +649,26 @@ def calculate_face_shape_landmarks_box_positions(face_shape_landmarks):
     return (minX, maxX), (minY, maxY), (width, height)
 
 
+def swap_images_at_face_position(image: Image, keypoints, image_to_swap: Image) -> Image:
+    foreground_parts = Image.new('RGBA', image.size)
+    for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
+        (minX, maxX), (minY, maxY), (width, height) = calculate_face_shape_landmarks_box_positions(face_shape_landmarks)
+        new_foreground_part = image_to_swap.crop((minX, minY, maxX, maxY))
+        new_foreground_part.putalpha(255)
+        foreground_parts.paste(new_foreground_part, (minX, minY), new_foreground_part)
+    image = apply_filter_on_faces(image, keypoints, foreground_parts)
+    return image
+
+
 def apply_filter_on_faces(image: Image, keypoints, foreground_parts):
-    # Create image from filters with mask
     shaped_foreground = Image.new('RGBA', image.size)
-
-    # Create a mask image with the same size as the original image
     mask = Image.new('L', foreground_parts.size, 0)
-
-    # Create a drawing context for the mask
     draw = ImageDraw.Draw(mask)
-
-    # Add shape to mask
     for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
         flat_list = [coordinate for point in face_shape_landmarks for coordinate in point]
         draw.polygon(flat_list, fill=255)
-
-    # Apply the mask to the new foreground
     shaped_foreground.paste(foreground_parts, mask=mask)
-
-    # Apply the new foreground to the original image
     image.paste(shaped_foreground, mask=shaped_foreground)
-
     return image
 
 
