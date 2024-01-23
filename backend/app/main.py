@@ -80,6 +80,26 @@ FILTERS = [
         'displayName': 'Opening'
     },
     {
+        'name': 'colorShift',
+        'displayName': 'Color Shift'
+    },
+    {
+        'name': 'pixelate',
+        'displayName': 'Pixelate'
+    },
+    {
+        'name': 'morphEyes',
+        'displayName': 'Morph Eyes'
+    },
+    {
+        'name': 'morphMouth',
+        'displayName': 'Morph Mouth'
+    },
+    {
+        'name': 'morphAll',
+        'displayName': 'Morph All'
+    },
+    {
         'name': 'sunglasses',
         'displayName': 'Sunglasses'
     },
@@ -228,6 +248,16 @@ async def apply_filter(data: ApplyFilterRequestData):
                 img = apply_closing(img, keypoints, data.face_only)
             case 'opening':
                 img = apply_opening(img, keypoints, data.face_only)
+            case 'colorShift':
+                img = apply_color_shift(img, keypoints, data.face_only)
+            case 'pixelate':
+                img = apply_pixelate(img, keypoints, data.face_only)
+            case 'morphEyes':
+                img = apply_morph_eyes(img, keypoints)
+            case 'morphMouth':
+                img = apply_morph_mouth(img, keypoints)
+            case 'morphAll':
+                img = apply_morph_all(img, keypoints)
             case 'sunglasses':
                 img = apply_sunglasses(img, keypoints)
             case 'faceMask':
@@ -497,6 +527,52 @@ def apply_opening(image: Image, keypoints, only_face=True) -> Image:
         return modified_image
 
 
+def apply_color_shift(image: Image, keypoints, only_face=True, max_shift_intensity=25) -> Image:
+    r_shift = random.randint(-max_shift_intensity, max_shift_intensity)
+    g_shift = random.randint(-max_shift_intensity, max_shift_intensity)
+    b_shift = random.randint(-max_shift_intensity, max_shift_intensity)
+    r, g, b = image.split()
+    r = r.point(lambda i: i + r_shift)
+    g = g.point(lambda i: i + g_shift)
+    b = b.point(lambda i: i + b_shift)
+    modified_image = Image.merge('RGB', (r, g, b))
+    if only_face:
+        return swap_images_at_face_position(image, keypoints, modified_image)
+    else:
+        return modified_image
+
+
+def apply_pixelate(image: Image, keypoints, only_face=True, pixel_size=10) -> Image:
+    small = image.resize((image.size[0]//pixel_size, image.size[1]//pixel_size), Image.NEAREST)
+    modified_image = small.resize(image.size, Image.NEAREST)
+    if only_face:
+        return swap_images_at_face_position(image, keypoints, modified_image)
+    else:
+        return modified_image
+
+
+def apply_morph_eyes(image: Image, keypoints, radius=75, morph_strength=10.0) -> Image:
+    image_cv = np.array(image)
+    image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
+    eye_points = [face_keypoints[key] for _, face_keypoints, _, _ in keypoints for key in ['left_eye', 'right_eye']]
+    image_cv = morph_image(image_cv, eye_points, radius, morph_strength)
+    return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
+
+def apply_morph_mouth(image: Image, keypoints, radius=75, morph_strength=10.0) -> Image:
+    image_cv = np.array(image)
+    image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
+    mouth_points = [face_keypoints[key] for _, face_keypoints, _, _ in keypoints for key in ['left_mouth', 'right_mouth', 'nose']]
+    image_cv = morph_image(image_cv, mouth_points, radius, morph_strength)
+    return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
+
+def apply_morph_all(image: Image, keypoints, radius=30, morph_strength=3.0) -> Image:
+    image_cv = np.array(image)
+    image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
+    all_points = [point for _, face_keypoints, outline, _ in keypoints for key, point in face_keypoints.items()] + [pt for _, _, outline, _ in keypoints for pt in outline]
+    image_cv = morph_image(image_cv, all_points, radius, morph_strength)
+    return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
+
+
 def apply_sunglasses(image: Image, keypoints, scale_factor: float = 2.5) -> Image:
     foreground = Image.open('filters/sunglasses.png')
     for (box, face_keypoints, face_shape_landmarks, _) in keypoints:
@@ -670,6 +746,22 @@ def apply_filter_on_faces(image: Image, keypoints, foreground_parts):
     shaped_foreground.paste(foreground_parts, mask=mask)
     image.paste(shaped_foreground, mask=shaped_foreground)
     return image
+
+
+def morph_image(image_cv, keypoints, radius, morph_strength):
+    h, w = image_cv.shape[:2]
+    for point in keypoints:
+        x_grid, y_grid = np.meshgrid(np.arange(w), np.arange(h))
+        dx = x_grid - point[0]
+        dy = y_grid - point[1]
+        distance = np.sqrt(dx**2 + dy**2)
+        mask = np.where(distance < radius, 1, 0)
+        displacement = np.exp(-distance / radius) * morph_strength
+        displacement *= mask
+        map_x = x_grid + displacement * np.sign(dx)
+        map_y = y_grid + displacement * np.sign(dy)
+        image_cv = cv2.remap(image_cv, map_x.astype(np.float32), map_y.astype(np.float32), cv2.INTER_LINEAR)
+    return image_cv
 
 
 def highlight_face_viola_jones(img: Image):
