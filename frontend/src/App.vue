@@ -12,6 +12,7 @@
         :currentAlgorithms="currentAlgorithms"
         :faceResult="faceResult"
         :autoDetectionMode="autoDetectionMode"
+        :faceOnly="faceOnly"
         @changeView="changeView"
         @resetImage="resetImage"
         @deleteImage="deleteImage"
@@ -22,6 +23,7 @@
         @toggleAutoDetectionMode="toggleAutoDetectionMode"
         @runFaceDetection="runFaceDetection"
         @runFaceRecognition="runFaceRecognition"
+        @toggleFaceOnly="toggleFaceOnly"
       />
     </v-main>
   </v-app>
@@ -52,6 +54,7 @@ export default {
       currentAlgorithms: [],
       faceResult: [],
       autoDetectionMode: false,
+      faceOnly: false,
       limit: 60,
       loadedAmount: 0,
       backendHost: "http://127.0.0.1:8000",
@@ -102,6 +105,10 @@ export default {
 
     async toggleAutoDetectionMode() {
       this.autoDetectionMode = !this.autoDetectionMode;
+    },
+
+    async toggleFaceOnly() {
+      this.faceOnly = !this.faceOnly;
     },
 
     async uploadImage(file, isOriginal, selectedFaceDetection) {
@@ -171,8 +178,8 @@ export default {
         filter: this.selectedFilter.name,
         base64: image.base64,
         hash: image.hash,
+        face_only: this.faceOnly,
       };
-      // this.selectedImage.base64 = require("@/assets/loading.json").base64; // TODO: currently garbage css
       const response = await fetch(this.backendHost + "/apply-filter", {
         method: "POST",
         headers: {

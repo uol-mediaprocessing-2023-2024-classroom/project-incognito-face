@@ -29,7 +29,7 @@
                   {{ selectedFilter ? selectedFilter.displayName : "Select Filter" }}
                 </v-btn>
               </template>
-              <v-list>
+              <v-list class="dropdownList">
                 <v-list-item
                   v-for="(filter, index) in currentFilters ? currentFilters : []"
                   :key="index"
@@ -47,6 +47,7 @@
               {{ detectionButtonText }}
             </button>
             <button v-else class="basicButton" @click="handleRecognitionButtonClick">Run Face Recognition</button>
+            <button class="basicButton" @click="toggleFaceOnly">Apply face only: {{ faceOnly ? 'ON' : 'OFF' }}</button>
           </div>
         </div>
       </div>
@@ -127,6 +128,7 @@ export default {
     currentAlgorithms: Array,
     autoDetectionMode: Boolean,
     faceResult: Array,
+    faceOnly: Boolean,
   },
 
   methods: {
@@ -181,6 +183,9 @@ export default {
     },
     handleRecognitionButtonClick() {
       this.$emit("runFaceRecognition", this.originalImage, this.modifiedImage);
+    },
+    toggleFaceOnly() {
+      this.$emit("toggleFaceOnly");
     },
     getFaceImage(name) {
       if (this.faceResult == null || this.faceResult.length <= 0) {
@@ -266,6 +271,11 @@ export default {
   width: 180px;
   height: 24px !important;
   box-shadow: none !important;
+}
+
+.dropdownList {
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .inputField {
