@@ -705,7 +705,7 @@ def apply_distance_transformation(image: Image) -> Image:
     dilated = binary_dilation(binary_image, iterations=5)
     eroded = binary_erosion(binary_image, iterations=5)
     morphed_image = np.where(dilated != eroded, 255, 0).astype(np.uint8)
-    return Image.fromarray(morphed_image)
+    return Image.fromarray(morphed_image).convert('RGB')
 
 def apply_vertical_edge(image: Image) -> Image:
     return image.filter(ImageFilter.Kernel((3, 3), (-1, 0, 1, -2, 0, 2, -1, 0, 1), 1, 0))
