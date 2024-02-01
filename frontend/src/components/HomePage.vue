@@ -12,7 +12,7 @@
                              header="Original Image" :isOriginal=true :selectedImage="originalImage" />
             <ImageWithButton :class="{ 'hideImage': modifiedImage === null, 'defaultImage': modifiedImage !== null }"
                              @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
-                             header="Modified Image" :isOriginal=false :selectedImage="modifiedImage"/>
+                             header="Modified Image" :isOriginal=false :selectedImage="modifiedImage" :buttons-hidden="modifiedImageButtonsHidden"/>
           </div>
           <div v-else class="selectedImageDisplay">
             <ImageWithButton class="defaultImage"
@@ -20,7 +20,7 @@
                              header="Original Image" :isOriginal=true :selectedImage="originalImage" />
             <ImageWithButton class="defaultImage"
                              @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
-                             header="Modified Image" :isOriginal=false :selectedImage="modifiedImage"/>
+                             header="Modified Image" :isOriginal=false :selectedImage="modifiedImage" :buttons-hidden="modifiedImageButtonsHidden"/>
           </div>
           <div class="inputField">
             <v-menu offset-y>
@@ -123,6 +123,7 @@ export default {
     selectedFilter: Object,
     originalImage: Object,
     modifiedImage: Object,
+    modifiedImageButtonsHidden: Object,
     originalImageOutputFR: Object,
     modifiedImageOutputFR: Object,
     resultFR: String,

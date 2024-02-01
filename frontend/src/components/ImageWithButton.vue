@@ -6,23 +6,25 @@
 
     <p v-if="this.isResult && !isOriginal" class="pClass"> {{resultString}} <br /></p>
 
+
     <div class="positionedParent">
-    <button v-if="!this.isResult" @click="resetImage()"
+      <div :class="{ 'buttonHide': buttonsHidden}">
+        <button v-if="!this.isResult" @click="resetImage()"
             class="resetButton"
           :class="{ 'buttonHide': selectedImage === null || isOriginal}">
-      <i style="font-size:24px" class="fa">&#xf021;</i>
-    </button>
-    <button v-if="!this.isResult" @click="deleteImage()"
+          <i style="font-size:24px" class="fa">&#xf021;</i>
+        </button>
+        <button v-if="!this.isResult" @click="deleteImage()"
             class="deleteButton"
           :class="{ 'buttonHide': selectedImage === null}">
-      <i style="font-size:28px" class="fa fa-trash"></i>
-    </button>
-    <button v-if="!this.isResult" @click="downloadImage()"
+          <i style="font-size:28px" class="fa fa-trash"></i>
+        </button>
+        <button v-if="!this.isResult" @click="downloadImage()"
             class="downloadButton"
           :class="{ 'buttonHide': selectedImage === null  || isOriginal}">
-      <i style="font-size:24px" class="fa fa-download"></i>
-    </button>
-
+          <i style="font-size:24px" class="fa fa-download"></i>
+        </button>
+      </div>
     <img v-bind:src="selectedImage ? selectedImage.base64 : require('@/assets/placeholder.json').base64" alt="Your Image"
          :class="{ 'resultImg': isResult, 'selectedImgBeforeUpload': selectedImage === null, 'selectedImgAfterUpload': selectedImage !== null }" />
     <button @click="$refs.fileInput.click()"
@@ -48,6 +50,7 @@ export default {
     header: String,
     resultString: String,
     selectedImage: Object,
+    buttonsHidden: Boolean,
   },
   methods: {
     resetUploadFile() {
@@ -84,6 +87,7 @@ export default {
 .selectedImageInfo {
   margin-left: 10px;
 }
+
 /*position: relative; */
 /* display: inline-block; */
 .image-container {

@@ -6,6 +6,7 @@
         :selectedFilter="selectedFilter"
         :originalImage="originalImage"
         :modifiedImage="modifiedImage"
+        :modifiedImageButtonsHidden="modifiedImageButtonsHidden"
         :originalImageOutputFR="originalImageOutputFR"
         :modifiedImageOutputFR="modifiedImageOutputFR"
         :resultFR="resultFR"
@@ -49,6 +50,7 @@ export default {
       originalImageCopy: null,
       modifiedImage: null,
       modifiedImageCopy: null,
+      modifiedImageButtonsHidden: false,
       originalImageOutputFR: null,
       modifiedImageOutputFR: null,
       resultFR: null,
@@ -184,6 +186,10 @@ export default {
       if (image == null || this.selectedFilter == null) {
         return;
       }
+      const loading = require("@/assets/loading.json");
+      this.modifiedImage = JSON.parse(JSON.stringify(image));
+      this.modifiedImage.base64 = loading.base64;
+      this.modifiedImageButtonsHidden = true;
       const requestBody = {
         filter: this.selectedFilter.name,
         base64: image.base64,
@@ -199,6 +205,7 @@ export default {
       });
       const jsonResponse = await response.json();
       this.modifiedImage.base64 = jsonResponse.base64;
+      this.modifiedImageButtonsHidden = false;
       if (this.autoDetectionMode) {
         await this.runFaceDetection(this.modifiedImage);
       }
