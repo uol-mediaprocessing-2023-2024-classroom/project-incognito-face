@@ -23,7 +23,7 @@
     <img v-bind:src="selectedImage ? selectedImage.base64 : require('@/assets/placeholder.json').base64" alt="Your Image"
          :class="{ 'resultImg': isResult, 'selectedImgBeforeUpload': selectedImage === null, 'selectedImgAfterUpload': selectedImage !== null }" />
     <button @click="$refs.fileInput.click()"
-          :class="{ 'basicButtonBeforeUpload': selectedImage === null, 'buttonHide': selectedImage !== null }"> Upload Image </button>
+          :class="{ 'basicButtonBeforeUpload': selectedImage === null, 'buttonHide': selectedImage !== null }"><i class="fa fa-cloud-upload"></i> Upload Image </button>
     <input
         class="fileInput"
         type="file"
@@ -114,10 +114,10 @@ export default {
   transform: translate(-50%, -50%);
   //background-color: rgb(204, 203, 205);
   background-color: green;
-  padding: 0px 4px 0px 4px;
+  //padding: 0px 0px 0px 0px;
   border-radius: 12px;
   width: 140px;
-  height: 60px
+  height: 35px
 }
 
 .buttonHide {
