@@ -57,87 +57,150 @@ FACE_DETECTION_ALGORITHMS = [
 FILTERS = [
     {
         'name': 'blur',
-        'displayName': 'Blur'
+        'displayName': 'Blur',
+        'faceDetection': True,
+        'faceRecognition': True,
+        'faceOnly': True
     },
     {
         'name': 'dithering',
-        'displayName': 'Quantize Colors'
+        'displayName': 'Quantize Colors',
+        'faceDetection': False,
+        'faceRecognition': False,
+        'faceOnly': True
     },
     {
         'name': 'minFilter',
-        'displayName': 'Min Filter'
+        'displayName': 'Min Filter',
+        'faceDetection': False,
+        'faceRecognition': True,
+        'faceOnly': True
     },
     {
         'name': 'maxFilter',
-        'displayName': 'Max Filter'
+        'displayName': 'Max Filter',
+        'faceDetection': False,
+        'faceRecognition': True,
+        'faceOnly': True
     },
     {
         'name': 'closing',
-        'displayName': 'Closing'
+        'displayName': 'Closing',
+        'faceDetection': False,
+        'faceRecognition': True,
+        'faceOnly': True
     },
     {
         'name': 'opening',
-        'displayName': 'Opening'
+        'displayName': 'Opening',
+        'faceDetection': False,
+        'faceRecognition': True,
+        'faceOnly': True
     },
     {
         'name': 'colorShift',
-        'displayName': 'Color Shift'
+        'displayName': 'Color Shift',
+        'faceDetection': False,
+        'faceRecognition': False,
+        'faceOnly': True
     },
     {
         'name': 'pixelate',
-        'displayName': 'Pixelate'
+        'displayName': 'Pixelate',
+        'faceDetection': True,
+        'faceRecognition': True,
+        'faceOnly': True
     },
     {
         'name': 'morphEyes',
-        'displayName': 'Morph Eyes'
+        'displayName': 'Morph Eyes',
+        'faceDetection': False,
+        'faceRecognition': True,
+        'faceOnly': False
     },
     {
         'name': 'morphMouth',
-        'displayName': 'Morph Mouth'
+        'displayName': 'Morph Mouth',
+        'faceDetection': False,
+        'faceRecognition': True,
+        'faceOnly': False
     },
     {
         'name': 'morphAll',
-        'displayName': 'Morph All'
+        'displayName': 'Morph All',
+        'faceDetection': False,
+        'faceRecognition': True,
+        'faceOnly': False
     },
     {
         'name': 'sunglasses',
-        'displayName': 'Sunglasses'
+        'displayName': 'Sunglasses',
+        'faceDetection': True,
+        'faceRecognition': True,
+        'faceOnly': False
     },
     {
         'name': 'faceMask',
-        'displayName': 'Face Mask'
+        'displayName': 'Face Mask',
+        'faceDetection': False,
+        'faceRecognition': False,
+        'faceOnly': False
     },
     {
         'name': 'medicineMask',
-        'displayName': 'Medicine Mask'
+        'displayName': 'Medicine Mask',
+        'faceDetection': True,
+        'faceRecognition': True,
+        'faceOnly': False
     },
     {
         'name': 'cowFace',
-        'displayName': 'Cow Face'
+        'displayName': 'Cow Face',
+        'faceDetection': True,
+        'faceRecognition': True,
+        'faceOnly': False
     },
     {
         'name': 'saltNPepper',
-        'displayName': 'Salt and Pepper'
+        'displayName': 'Salt and Pepper',
+        'faceDetection': True,
+        'faceRecognition': True,
+        'faceOnly': False
     },
     {
         'name': 'hideWithMasks',
-        'displayName': 'Hide With Masks'
+        'displayName': 'Hide With Masks',
+        'faceDetection': True,
+        'faceRecognition': False,
+        'faceOnly': False
     },
     {
         'name': 'hightlightKeypoints',
-        'displayName': 'Highlight Keypoints'
+        'displayName': 'Highlight Keypoints',
+        'faceDetection': False,
+        'faceRecognition': False,
+        'faceOnly': False
     },
     {
         'name': 'distanceTransformation',
-        'displayName': 'Distance Trans.'
+        'displayName': 'Distance Trans.',
+        'faceDetection': False,
+        'faceRecognition': False,
+        'faceOnly': False
     },
     {
         'name': 'verticalEdge',
-        'displayName': 'Vertical Edge'
+        'displayName': 'Vertical Edge',
+        'faceDetection': False,
+        'faceRecognition': False,
+        'faceOnly': False
     },
     {
         'name': 'horizontalEdge',
-        'displayName': 'Horizontal Edge'
+        'displayName': 'Horizontal Edge',
+        'faceDetection': False,
+        'faceRecognition': False,
+        'faceOnly': False
     }
 ]
 
@@ -571,7 +634,7 @@ def apply_morph_mouth(image: Image, keypoints, radius=75, morph_strength=10.0) -
     return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
 
 
-def apply_morph_all(image: Image, keypoints, radius=30, morph_strength=3.0) -> Image:
+def apply_morph_all(image: Image, keypoints, radius=75, morph_strength=10.0) -> Image:
     image_cv = np.array(image)
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
     all_points = [point for _, face_keypoints, outline, _ in keypoints for key, point in face_keypoints.items()] + [pt

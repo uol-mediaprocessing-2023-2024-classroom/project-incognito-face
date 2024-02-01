@@ -54,6 +54,7 @@ export default {
       originalImageOutputFR: null,
       modifiedImageOutputFR: null,
       resultFR: null,
+      allFilters: [],
       currentFilters: [],
       currentAlgorithms: [],
       faceResult: [],
@@ -75,6 +76,12 @@ export default {
       this.faceResult = [];
       this.currentAlgorithms = null;
       this.selectedFilter = null;
+      this.currentFilters = [];
+      if (this.selectedFaceDetection) {
+        this.loadFilters("faceDetection");
+      } else {
+        this.loadFilters("faceRecognition");
+      }
     },
 
     async resetImage(isOriginal) {
@@ -110,9 +117,14 @@ export default {
       this.modifiedImageOutputFR = null;
     },
 
-    async loadFilters() {
+    async loadFilters(filter) {
       const response = await fetch(this.backendHost + "/get-filters");
-      this.currentFilters = await response.json();
+      this.allFilters = await response.json();
+      if (filter) {
+        this.currentFilters = this.allFilters.filter(f => f[filter]);
+      } else {
+        this.currentFilters = this.allFilters;
+      }
     },
 
     async toggleAutoDetectionMode() {

@@ -1,26 +1,59 @@
 <template>
   <v-container>
     <div id="toggle">
-       <Toggle @changeView="changeView" />
+      <Toggle @changeView="changeView" />
     </div>
     <div class="selectedImageField">
       <div class="selectedImageContainer">
         <div style="display: flex">
           <div v-if="this.selectedFaceDetection" class="selectedImageDisplay">
-            <ImageWithButton class="defaultImage"
-                             @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
-                             header="Original Image" :isOriginal=true :selectedImage="originalImage" />
-            <ImageWithButton :class="{ 'hideImage': modifiedImage === null, 'defaultImage': modifiedImage !== null }"
-                             @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
-                             header="Modified Image" :isOriginal=false :selectedImage="modifiedImage" :buttons-hidden="modifiedImageButtonsHidden"/>
+            <ImageWithButton
+              class="defaultImage"
+              @uploadImage="uploadImage"
+              @resetImage="resetImage"
+              @deleteImage="deleteImage"
+              @downloadImage="downloadImage"
+              header="Original Image"
+              :isOriginal="true"
+              :selectedImage="originalImage"
+            />
+            <ImageWithButton
+              :class="{
+                hideImage: modifiedImage === null,
+                defaultImage: modifiedImage !== null,
+              }"
+              @uploadImage="uploadImage"
+              @resetImage="resetImage"
+              @deleteImage="deleteImage"
+              @downloadImage="downloadImage"
+              header="Modified Image"
+              :isOriginal="false"
+              :selectedImage="modifiedImage"
+              :buttons-hidden="modifiedImageButtonsHidden"
+            />
           </div>
           <div v-else class="selectedImageDisplay">
-            <ImageWithButton class="defaultImage"
-                             @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
-                             header="Original Image" :isOriginal=true :selectedImage="originalImage" />
-            <ImageWithButton class="defaultImage"
-                             @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
-                             header="Modified Image" :isOriginal=false :selectedImage="modifiedImage" :buttons-hidden="modifiedImageButtonsHidden"/>
+            <ImageWithButton
+              class="defaultImage"
+              @uploadImage="uploadImage"
+              @resetImage="resetImage"
+              @deleteImage="deleteImage"
+              @downloadImage="downloadImage"
+              header="Original Image"
+              :isOriginal="true"
+              :selectedImage="originalImage"
+            />
+            <ImageWithButton
+              class="defaultImage"
+              @uploadImage="uploadImage"
+              @resetImage="resetImage"
+              @deleteImage="deleteImage"
+              @downloadImage="downloadImage"
+              header="Modified Image"
+              :isOriginal="false"
+              :selectedImage="modifiedImage"
+              :buttons-hidden="modifiedImageButtonsHidden"
+            />
           </div>
           <div class="inputField">
             <v-menu offset-y>
@@ -30,12 +63,16 @@
                 </v-btn>
               </template>
               <v-list class="dropdownList">
-                <v-list-item
-                  v-for="(filter, index) in currentFilters ? currentFilters : []"
-                  :key="index"
-                >
+                <v-list-item v-for="(filter, index) in currentFilters" :key="index">
                   <v-list-item-content @click="selectFilter(filter)">
                     <v-list-item-title>{{ filter.displayName }}</v-list-item-title>
+                  </v-list-item-content>
+                </v-list-item>
+                <v-list-item v-if="!allFiltersLoaded">
+                  <v-list-item-content @click.stop="loadAllFilters">
+                    <v-list-item-title>
+                      <b>Load All</b>
+                    </v-list-item-title>
                   </v-list-item-content>
                 </v-list-item>
               </v-list>
@@ -43,11 +80,23 @@
             <button class="basicButton" @click="applyFilter(modifiedImage)">
               Apply Filter
             </button>
-            <button v-if="this.selectedFaceDetection" class="basicButton" @click="handleDetectionButtonClick">
+            <button
+              v-if="this.selectedFaceDetection"
+              class="basicButton"
+              @click="handleDetectionButtonClick"
+            >
               {{ detectionButtonText }}
             </button>
-            <button v-else class="basicButton" @click="handleRecognitionButtonClick">Run Face Recognition</button>
-            <button class="basicButton" @click="toggleFaceOnly">Apply face only: {{ faceOnly ? 'ON' : 'OFF' }}</button>
+            <button v-else class="basicButton" @click="handleRecognitionButtonClick">
+              Run Face Recognition
+            </button>
+            <button
+              class="basicButton"
+              @click="toggleFaceOnly"
+              :disabled="!selectedFilter || selectedFilter.faceOnly === undefined"
+            >
+              Apply face only: {{ faceOnly ? "ON" : "OFF" }}
+            </button>
           </div>
         </div>
       </div>
@@ -72,7 +121,11 @@
               <td class="resultTable">
                 <img
                   class="resultImg"
-                  :src="getFaceImage(algorithm.name)? getFaceImage(algorithm.name).base64: ''"
+                  :src="
+                    getFaceImage(algorithm.name)
+                      ? getFaceImage(algorithm.name).base64
+                      : ''
+                  "
                 />
               </td>
               <td class="resultTable">
@@ -92,14 +145,36 @@
         </table>
         <div v-else>
           <div class="frContainer">
-            <ImageWithButton :class="{ 'hideImage': originalImageOutputFR === null, 'defaultImage': originalImageOutputFR !== null }"
-                           @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
-                           header="Original Image" :isOriginal=true :isResult=true :selectedImage="originalImageOutputFR" />
+            <ImageWithButton
+              :class="{
+                hideImage: originalImageOutputFR === null,
+                defaultImage: originalImageOutputFR !== null,
+              }"
+              @uploadImage="uploadImage"
+              @resetImage="resetImage"
+              @deleteImage="deleteImage"
+              @downloadImage="downloadImage"
+              header="Original Image"
+              :isOriginal="true"
+              :isResult="true"
+              :selectedImage="originalImageOutputFR"
+            />
 
-            <ImageWithButton :class="{ 'hideImage': modifiedImageOutputFR === null, 'defaultImage': modifiedImageOutputFR !== null }"
-                           @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
-                           header="Recognized Faces" :isOriginal=false :isResult=true :selectedImage="modifiedImageOutputFR"
-                           :resultString="resultFR" />
+            <ImageWithButton
+              :class="{
+                hideImage: modifiedImageOutputFR === null,
+                defaultImage: modifiedImageOutputFR !== null,
+              }"
+              @uploadImage="uploadImage"
+              @resetImage="resetImage"
+              @deleteImage="deleteImage"
+              @downloadImage="downloadImage"
+              header="Recognized Faces"
+              :isOriginal="false"
+              :isResult="true"
+              :selectedImage="modifiedImageOutputFR"
+              :resultString="resultFR"
+            />
           </div>
         </div>
       </div>
@@ -108,14 +183,14 @@
 </template>
 
 <script>
-import Toggle from './Toggle.vue';
+import Toggle from "./Toggle.vue";
 import ImageWithButton from "./ImageWithButton.vue";
 
 export default {
   name: "HomePage",
 
   created() {
-    this.loadFilters();
+    this.loadDetectionFilters();
   },
 
   props: {
@@ -123,7 +198,7 @@ export default {
     selectedFilter: Object,
     originalImage: Object,
     modifiedImage: Object,
-    modifiedImageButtonsHidden: Object,
+    modifiedImageButtonsHidden: Boolean,
     originalImageOutputFR: Object,
     modifiedImageOutputFR: Object,
     resultFR: String,
@@ -134,9 +209,16 @@ export default {
     faceOnly: Boolean,
   },
 
+  data() {
+    return {
+      allFiltersLoaded: false,
+    };
+  },
+
   methods: {
     changeView() {
       this.$emit("changeView");
+      allFiltersLoaded = false;
     },
 
     uploadImage(file, isOriginal) {
@@ -150,10 +232,7 @@ export default {
     },
     downloadImage(image) {
       const base64 = image.base64.split(",")[1];
-      const contentType = image.base64
-        .split(",")[0]
-        .split(":")[1]
-        .split(";")[0];
+      const contentType = image.base64.split(",")[0].split(":")[1].split(";")[0];
       const byteCharacters = atob(base64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -167,9 +246,12 @@ export default {
       link.click();
       URL.revokeObjectURL(link.href);
     },
-
-    loadFilters() {
-      this.$emit("loadFilters");
+    loadDetectionFilters() {
+      this.$emit("loadFilters", "faceDetection");
+    },
+    loadAllFilters() {
+      this.$emit("loadFilters", false);
+      this.allFiltersLoaded = true;
     },
     selectFilter(filter) {
       this.$emit("selectFilter", filter);
@@ -221,7 +303,7 @@ export default {
 }
 
 .selectedImageContainer {
-   margin-right: 10px;
+  margin-right: 10px;
 }
 
 .selectedImageDisplay {
@@ -242,7 +324,6 @@ export default {
 }
 
 .defaultImage {
-
 }
 
 .hideImage {
@@ -251,7 +332,7 @@ export default {
 
 .resultImg {
   max-width: 100%;
-  max-height:  100%;
+  max-height: 100%;
 }
 
 .resultTable {
@@ -264,6 +345,12 @@ export default {
   margin-right: 5px;
   border-radius: 3px;
   width: 180px;
+}
+
+.basicButton:disabled {
+    background-color: rgba(128, 128, 128, 0.5);
+    cursor: not-allowed;
+    color: #666;
 }
 
 .basicDropdown {
@@ -309,5 +396,4 @@ export default {
   align-items: center;
   margin-bottom: 5px;
 }
-
 </style>
