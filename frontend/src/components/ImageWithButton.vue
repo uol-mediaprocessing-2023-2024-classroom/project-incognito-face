@@ -3,6 +3,9 @@
     <div class="selectedImageInfo">
           <h2>{{header}} <br /></h2>
     </div>
+
+    <p v-if="this.isResult && !isOriginal" class="pClass"> {{resultString}} <br /></p>
+
     <div class="positionedParent">
     <button v-if="!this.isResult" @click="resetImage()"
             class="resetButton"
@@ -43,6 +46,7 @@ export default {
     isOriginal: Boolean,
     isResult: Boolean,
     header: String,
+    resultString: String,
     selectedImage: Object,
   },
   methods: {
@@ -72,6 +76,10 @@ export default {
 
 <style scoped>
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css');
+
+.pClass {
+  margin: 0;
+}
 
 .selectedImageInfo {
   margin-left: 10px;

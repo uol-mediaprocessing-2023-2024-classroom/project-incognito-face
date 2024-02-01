@@ -52,7 +52,7 @@
         </div>
       </div>
       <div class="tableFDContainer">
-        <table v-if="this.selectedFaceDetection">
+        <table v-if="this.selectedFaceDetection && this.faceResult.length !== 0">
           <thead>
             <tr>
               <th class="resultTable">
@@ -98,7 +98,8 @@
 
             <ImageWithButton :class="{ 'hideImage': modifiedImageOutputFR === null, 'defaultImage': modifiedImageOutputFR !== null }"
                            @uploadImage="uploadImage" @resetImage="resetImage" @deleteImage="deleteImage" @downloadImage="downloadImage"
-                           header="Recognized Faces (same colors)" :isOriginal=false :isResult=true :selectedImage="modifiedImageOutputFR"/>
+                           header="Recognized Faces" :isOriginal=false :isResult=true :selectedImage="modifiedImageOutputFR"
+                           :resultString="resultFR" />
           </div>
         </div>
       </div>
@@ -124,6 +125,7 @@ export default {
     modifiedImage: Object,
     originalImageOutputFR: Object,
     modifiedImageOutputFR: Object,
+    resultFR: String,
     currentFilters: Array,
     currentAlgorithms: Array,
     autoDetectionMode: Boolean,

@@ -8,6 +8,7 @@
         :modifiedImage="modifiedImage"
         :originalImageOutputFR="originalImageOutputFR"
         :modifiedImageOutputFR="modifiedImageOutputFR"
+        :resultFR="resultFR"
         :currentFilters="currentFilters"
         :currentAlgorithms="currentAlgorithms"
         :faceResult="faceResult"
@@ -50,6 +51,7 @@ export default {
       modifiedImageCopy: null,
       originalImageOutputFR: null,
       modifiedImageOutputFR: null,
+      resultFR: null,
       currentFilters: [],
       currentAlgorithms: [],
       faceResult: [],
@@ -80,6 +82,10 @@ export default {
       else {
         this.modifiedImage = JSON.parse(JSON.stringify(this.modifiedImageCopy));
       }
+      this.currentAlgorithms = null;
+      this.faceResult = [];
+      this.originalImageOutputFR = null;
+      this.modifiedImageOutputFR = null;
     },
     async deleteImage(isOriginal, selectedFaceDetection) {
       if (selectedFaceDetection) {
@@ -96,6 +102,10 @@ export default {
         this.modifiedImage = null;
         this.modifiedImageCopy = null;
       }
+      this.currentAlgorithms = null;
+      this.faceResult = [];
+      this.originalImageOutputFR = null;
+      this.modifiedImageOutputFR = null;
     },
 
     async loadFilters() {
@@ -233,6 +243,7 @@ export default {
       this.modifiedImageOutputFR = JSON.parse(JSON.stringify(mod_image));
       this.originalImageOutputFR.base64 = loading.base64;
       this.modifiedImageOutputFR.base64 = loading.base64;
+      this.resultFR = "";
       const requestBody = {
         orig_hash: orig_image.hash,
         orig_base64: orig_image.base64,
@@ -249,6 +260,7 @@ export default {
 
       this.originalImageOutputFR.base64 = jsonResponse.orig_base64;
       this.modifiedImageOutputFR.base64 = jsonResponse.mod_base64;
+      this.resultFR = jsonResponse.metadata;
     },
   },
 };

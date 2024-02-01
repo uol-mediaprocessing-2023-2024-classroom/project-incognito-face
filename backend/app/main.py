@@ -243,7 +243,7 @@ async def apply_filter(data: ApplyFilterRequestData):
             case 'minFilter':
                 img = apply_min_filter(img, keypoints, data.face_only)
             case 'maxFilter':
-                img = apply_max_filter(img, keypoints, data.face_only)               
+                img = apply_max_filter(img, keypoints, data.face_only)
             case 'closing':
                 img = apply_closing(img, keypoints, data.face_only)
             case 'opening':
@@ -466,17 +466,19 @@ def process_face_recognition(orig_hash, orig_base64, mod_base64):
     orig_img = Image.open(BytesIO(base64.b64decode(orig_base64[22:])))
     mod_img = Image.open(BytesIO(base64.b64decode(mod_base64[22:])))
     try:
-        orig_img, mod_img = recognize_faces_hog_svm(orig_img, mod_img, get_keypoints(orig_img, True, orig_hash))
+        orig_img, mod_img, count_of_matches = recognize_faces_hog_svm(orig_img, mod_img, get_keypoints(orig_img, True, orig_hash))
     except Exception as e:
         print(f'An error occurred while trying to run face recognition: {e}')
         traceback.print_exc()
+        count_of_matches = 0
     orig_img_bytes_io = BytesIO()
     orig_img.save(orig_img_bytes_io, format='PNG')
     mod_img_bytes_io = BytesIO()
     mod_img.save(mod_img_bytes_io, format='PNG')
     return {
         'orig_base64': f'data:image/png;base64,{base64.b64encode(orig_img_bytes_io.getvalue()).decode("utf-8")}',
-        'mod_base64': f'data:image/png;base64,{base64.b64encode(mod_img_bytes_io.getvalue()).decode("utf-8")}'
+        'mod_base64': f'data:image/png;base64,{base64.b64encode(mod_img_bytes_io.getvalue()).decode("utf-8")}',
+        'metadata': f'Number of recognized faces: {count_of_matches}' if count_of_matches != 0 else f'No faces were recognized'
     }
 
 
@@ -511,6 +513,7 @@ def apply_min_filter(image: Image, keypoints, only_face=True) -> Image:
     else:
         return modified_image
 
+
 def apply_closing(image: Image, keypoints, only_face=True) -> Image:
     modified_image = apply_min_filter(apply_max_filter(image, keypoints, False), keypoints, False)
     if only_face:
@@ -543,7 +546,7 @@ def apply_color_shift(image: Image, keypoints, only_face=True, max_shift_intensi
 
 
 def apply_pixelate(image: Image, keypoints, only_face=True, pixel_size=10) -> Image:
-    small = image.resize((image.size[0]//pixel_size, image.size[1]//pixel_size), Image.NEAREST)
+    small = image.resize((image.size[0] // pixel_size, image.size[1] // pixel_size), Image.NEAREST)
     modified_image = small.resize(image.size, Image.NEAREST)
     if only_face:
         return swap_images_at_face_position(image, keypoints, modified_image)
@@ -558,17 +561,28 @@ def apply_morph_eyes(image: Image, keypoints, radius=75, morph_strength=10.0) ->
     image_cv = morph_image(image_cv, eye_points, radius, morph_strength)
     return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
 
+
 def apply_morph_mouth(image: Image, keypoints, radius=75, morph_strength=10.0) -> Image:
     image_cv = np.array(image)
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
-    mouth_points = [face_keypoints[key] for _, face_keypoints, _, _ in keypoints for key in ['left_mouth', 'right_mouth', 'nose']]
+    mouth_points = [face_keypoints[key] for _, face_keypoints, _, _ in keypoints for key in
+                    ['left_mouth', 'right_mouth', 'nose']]
     image_cv = morph_image(image_cv, mouth_points, radius, morph_strength)
     return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
+
 
 def apply_morph_all(image: Image, keypoints, radius=30, morph_strength=3.0) -> Image:
     image_cv = np.array(image)
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
-    all_points = [point for _, face_keypoints, outline, _ in keypoints for key, point in face_keypoints.items()] + [pt for _, _, outline, _ in keypoints for pt in outline]
+    all_points = [point for _, face_keypoints, outline, _ in keypoints for key, point in face_keypoints.items()] + [pt
+                                                                                                                    for
+                                                                                                                    _, _, outline, _
+                                                                                                                    in
+                                                                                                                    keypoints
+                                                                                                                    for
+                                                                                                                    pt
+                                                                                                                    in
+                                                                                                                    outline]
     image_cv = morph_image(image_cv, all_points, radius, morph_strength)
     return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
 
@@ -707,6 +721,7 @@ def apply_distance_transformation(image: Image) -> Image:
     morphed_image = np.where(dilated != eroded, 255, 0).astype(np.uint8)
     return Image.fromarray(morphed_image).convert('RGB')
 
+
 def apply_vertical_edge(image: Image) -> Image:
     return image.filter(ImageFilter.Kernel((3, 3), (-1, 0, 1, -2, 0, 2, -1, 0, 1), 1, 0))
 
@@ -754,7 +769,7 @@ def morph_image(image_cv, keypoints, radius, morph_strength):
         x_grid, y_grid = np.meshgrid(np.arange(w), np.arange(h))
         dx = x_grid - point[0]
         dy = y_grid - point[1]
-        distance = np.sqrt(dx**2 + dy**2)
+        distance = np.sqrt(dx ** 2 + dy ** 2)
         mask = np.where(distance < radius, 1, 0)
         displacement = np.exp(-distance / radius) * morph_strength
         displacement *= mask
@@ -861,16 +876,20 @@ def recognize_faces_hog_svm(orig_img: Image, mod_img: Image, orig_keypoints):
         face_encodings_orig.append(np.array(face_encoding_orig))
         boxes_orig.append(box)
 
+    count_of_matches = 0
+
     for j, face_encoding_unknown in enumerate(face_encodings_unknown):
         matches = face_recognition.compare_faces(face_encodings_orig, face_encoding_unknown, tolerance=0.55)
 
         for i, match in enumerate(matches):
             if match:
+                count_of_matches += 1
                 selected_color = palette[(j * 2) % num_colors]
                 bgr_color = tuple(int(value * 255) for value in selected_color)
                 box_orig = boxes_orig[i]
                 box_mod = boxes_mod[j]
-                top, right, bottom, left = box_orig[1], box_orig[0] + box_orig[2], box_orig[1] + box_orig[3], box_orig[0]
+                top, right, bottom, left = box_orig[1], box_orig[0] + box_orig[2], box_orig[1] + box_orig[3], box_orig[
+                    0]
                 cv2.rectangle(orig_img_bgr, (left, top), (right, bottom), bgr_color, 6)
 
                 top, right, bottom, left = box_mod[1], box_mod[0] + box_mod[2], box_mod[1] + box_mod[3], box_mod[0]
@@ -878,7 +897,7 @@ def recognize_faces_hog_svm(orig_img: Image, mod_img: Image, orig_keypoints):
 
     orig_img_rgb = cv2.cvtColor(orig_img_bgr, cv2.COLOR_BGR2RGB)
     mod_img_rgb = cv2.cvtColor(mod_img_bgr, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(orig_img_rgb), Image.fromarray(mod_img_rgb)
+    return Image.fromarray(orig_img_rgb), Image.fromarray(mod_img_rgb), count_of_matches
 
 
 # Global exception handler that catches all exceptions not handled by specific exception handlers.
@@ -904,6 +923,7 @@ hog_svm_shape_predictor = dlib.shape_predictor('resources/shape_predictor_68_fac
 num_colors = 11
 
 palette = sns.color_palette("husl", n_colors=num_colors)
+
 
 # auxiliary methods
 def apply_alpha_to_transparent_image(foreground: Image, alpha_of_masks: int) -> Image:
