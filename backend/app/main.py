@@ -529,7 +529,7 @@ def process_face_recognition(orig_hash, orig_base64, mod_base64):
     orig_img = Image.open(BytesIO(base64.b64decode(orig_base64[22:])))
     mod_img = Image.open(BytesIO(base64.b64decode(mod_base64[22:])))
     try:
-        orig_img, mod_img, count_of_matches = recognize_faces_hog_svm(orig_img, mod_img, get_keypoints(orig_img, True, orig_hash))
+        orig_img, mod_img, count_of_matches = recognize_faces(orig_img, mod_img, get_keypoints(orig_img, True, orig_hash))
     except Exception as e:
         print(f'An error occurred while trying to run face recognition: {e}')
         traceback.print_exc()
@@ -920,7 +920,7 @@ def highlight_face_ssd(img: Image):
     return Image.fromarray(img_rgb), number_of_faces, confidence
 
 
-def recognize_faces_hog_svm(orig_img: Image, mod_img: Image, orig_keypoints):
+def recognize_faces(orig_img: Image, mod_img: Image, orig_keypoints):
     orig_img_bgr = cv2.cvtColor(np.array(orig_img), cv2.COLOR_RGB2BGR)
     mod_img_bgr = cv2.cvtColor(np.array(mod_img), cv2.COLOR_RGB2BGR)
 
