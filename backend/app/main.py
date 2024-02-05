@@ -56,60 +56,32 @@ FACE_DETECTION_ALGORITHMS = [
 ]
 FILTERS = [
     {
-        'name': 'blur',
-        'displayName': 'Blur',
-        'faceDetection': True,
-        'faceRecognition': True,
-        'faceOnly': True
-    },
-    {
-        'name': 'dithering',
-        'displayName': 'Quantize Colors',
-        'faceDetection': False,
-        'faceRecognition': False,
-        'faceOnly': True
-    },
-    {
-        'name': 'minFilter',
-        'displayName': 'Min Filter',
-        'faceDetection': False,
-        'faceRecognition': True,
-        'faceOnly': True
-    },
-    {
-        'name': 'maxFilter',
-        'displayName': 'Max Filter',
-        'faceDetection': False,
-        'faceRecognition': True,
-        'faceOnly': True
-    },
-    {
-        'name': 'closing',
-        'displayName': 'Closing',
-        'faceDetection': False,
-        'faceRecognition': True,
-        'faceOnly': True
-    },
-    {
-        'name': 'opening',
-        'displayName': 'Opening',
-        'faceDetection': False,
-        'faceRecognition': True,
-        'faceOnly': True
-    },
-    {
-        'name': 'colorShift',
-        'displayName': 'Color Shift',
-        'faceDetection': False,
-        'faceRecognition': False,
-        'faceOnly': True
-    },
-    {
         'name': 'pixelate',
         'displayName': 'Pixelate',
         'faceDetection': True,
         'faceRecognition': True,
         'faceOnly': True
+    },
+    {
+        'name': 'saltNPepper',
+        'displayName': 'Salt and Pepper',
+        'faceDetection': True,
+        'faceRecognition': True,
+        'faceOnly': False
+    },
+    {
+        'name': 'hideWithMasks',
+        'displayName': 'Hide With Masks',
+        'faceDetection': True,
+        'faceRecognition': False,
+        'faceOnly': False
+    },
+    {
+        'name': 'cowFace',
+        'displayName': 'Cow Face',
+        'faceDetection': True,
+        'faceRecognition': True,
+        'faceOnly': False
     },
     {
         'name': 'morphEyes',
@@ -133,17 +105,17 @@ FILTERS = [
         'faceOnly': False
     },
     {
+        'name': 'blur',
+        'displayName': 'Blur',
+        'faceDetection': True,
+        'faceRecognition': True,
+        'faceOnly': True
+    },
+    {
         'name': 'sunglasses',
         'displayName': 'Sunglasses',
         'faceDetection': True,
         'faceRecognition': True,
-        'faceOnly': False
-    },
-    {
-        'name': 'faceMask',
-        'displayName': 'Face Mask',
-        'faceDetection': False,
-        'faceRecognition': False,
         'faceOnly': False
     },
     {
@@ -154,23 +126,51 @@ FILTERS = [
         'faceOnly': False
     },
     {
-        'name': 'cowFace',
-        'displayName': 'Cow Face',
-        'faceDetection': True,
+        'name': 'minFilter',
+        'displayName': 'Min Filter',
+        'faceDetection': False,
         'faceRecognition': True,
-        'faceOnly': False
+        'faceOnly': True
     },
     {
-        'name': 'saltNPepper',
-        'displayName': 'Salt and Pepper',
-        'faceDetection': True,
+        'name': 'maxFilter',
+        'displayName': 'Max Filter',
+        'faceDetection': False,
         'faceRecognition': True,
-        'faceOnly': False
+        'faceOnly': True
     },
     {
-        'name': 'hideWithMasks',
-        'displayName': 'Hide With Masks',
-        'faceDetection': True,
+        'name': 'opening',
+        'displayName': 'Opening',
+        'faceDetection': False,
+        'faceRecognition': True,
+        'faceOnly': True
+    },
+    {
+        'name': 'closing',
+        'displayName': 'Closing',
+        'faceDetection': False,
+        'faceRecognition': True,
+        'faceOnly': True
+    },
+    {
+        'name': 'dithering',
+        'displayName': 'Quantize Colors',
+        'faceDetection': False,
+        'faceRecognition': False,
+        'faceOnly': True
+    },
+    {
+        'name': 'colorShift',
+        'displayName': 'Color Shift',
+        'faceDetection': False,
+        'faceRecognition': False,
+        'faceOnly': True
+    },
+    {
+        'name': 'faceMask',
+        'displayName': 'Face Mask',
+        'faceDetection': False,
         'faceRecognition': False,
         'faceOnly': False
     },
