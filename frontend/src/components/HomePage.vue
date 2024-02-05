@@ -93,7 +93,7 @@
             <button
               class="basicButton"
               @click="toggleFaceOnly"
-              :disabled="!selectedFilter || selectedFilter.faceOnly === undefined"
+              :disabled="!selectedFilter || selectedFilter.faceOnly == false"
             >
               Apply face only: {{ faceOnly ? "ON" : "OFF" }}
             </button>
@@ -218,7 +218,7 @@ export default {
   methods: {
     changeView() {
       this.$emit("changeView");
-      allFiltersLoaded = false;
+      this.allFiltersLoaded = false;
     },
 
     uploadImage(file, isOriginal) {
