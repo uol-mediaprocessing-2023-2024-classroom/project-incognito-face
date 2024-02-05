@@ -621,6 +621,7 @@ def apply_morph_eyes(image: Image, keypoints, radius=75, morph_strength=10.0) ->
     image_cv = np.array(image)
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
     eye_points = [face_keypoints[key] for _, face_keypoints, _, _ in keypoints for key in ['left_eye', 'right_eye']]
+    radius = keypoints[0][0][2] / 3
     image_cv = morph_image(image_cv, eye_points, radius, morph_strength)
     return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
 
@@ -630,6 +631,7 @@ def apply_morph_mouth(image: Image, keypoints, radius=75, morph_strength=10.0) -
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
     mouth_points = [face_keypoints[key] for _, face_keypoints, _, _ in keypoints for key in
                     ['left_mouth', 'right_mouth', 'nose']]
+    radius = keypoints[0][0][2] / 6
     image_cv = morph_image(image_cv, mouth_points, radius, morph_strength)
     return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
 
@@ -646,6 +648,7 @@ def apply_morph_all(image: Image, keypoints, radius=75, morph_strength=10.0) -> 
                                                                                                                     pt
                                                                                                                     in
                                                                                                                     outline]
+    radius = keypoints[0][0][2] / 12
     image_cv = morph_image(image_cv, all_points, radius, morph_strength)
     return Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
 
