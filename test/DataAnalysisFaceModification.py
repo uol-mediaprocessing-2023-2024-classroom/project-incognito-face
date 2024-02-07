@@ -27,6 +27,7 @@ import main as server
 
 ## Counting
 
+
 def get_faces():
     return datasets.fetch_lfw_people(color=True, min_faces_per_person=100, resize=1)
 
@@ -40,7 +41,8 @@ def find_keypoints(image: Image):
         box = [face.left(), face.top(), face.width(), face.height()]
         face_keypoints = server.calculate_face_keypoints(all_landmarks)
         face_shape_landmarks = server.calculate_face_shape_landmarks(all_landmarks)
-        box_and_keypoints_list.append((box, face_keypoints, face_shape_landmarks))
+        face_encoding = server.calculate_face_encoding(np.asarray(image), box)
+        box_and_keypoints_list.append((box, face_keypoints, face_shape_landmarks, face_encoding))
 
     return box_and_keypoints_list
 
@@ -128,7 +130,6 @@ def image_modification_plot_hog_and_alpha(title: str, modification_description: 
 
 
 #Setup
-
 plot_img = get_faces().images[0]
 scaled_plot = (plot_img * 255).astype(np.uint8)
 pil_img = Image.fromarray(scaled_plot)
@@ -165,6 +166,15 @@ keypoints_plot_img = find_keypoints(pil_img)
 #                                      )
 
 # Hide with Face
-plot_before_and_after_modification(pil_img_copy,
-                                   server.apply_medicine_mask(pil_img, keypoints_plot_img),
-                                   'Hide With Face')
+# plot_before_and_after_modification(pil_img_copy,
+#                                    server.apply_medicine_mask(pil_img, keypoints_plot_img),
+#                                    'Hide With Face')
+
+# Pixelate
+# plot_before_and_after_modification(pil_img_copy, server.apply_pixelate(pil_img, keypoints_plot_img, pixel_size=2), 'Pixelate')
+#image_modification_plot_hog_and_alpha('Pixelate Modification', 'Applied Pixelate', server.apply_pixelate, [2,4,6,8])
+
+# Blur
+#plot_before_and_after_modification(pil_img_copy, server.apply_blur(pil_img, keypoints_plot_img), 'Box Blur')
+#image_modification_plot_hog_and_alpha('Box Blur Modification', ' Box Blur with radius of 1', server.apply_blur)
+
