@@ -1,3 +1,7 @@
+import os
+import sys
+from typing import Callable
+
 import cv2
 import dlib
 import face_recognition
@@ -5,6 +9,11 @@ import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
 from sklearn import datasets
+
+sys.path.append('../backend/app')
+# we always call serverfrom here.
+os.chdir('../backend/')
+import main as server
 
 hog_svm_detector = dlib.get_frontal_face_detector()
 
@@ -52,18 +61,80 @@ def get_face_pairs():
     return X_pairs[y_pairs == 1]
 
 
-face_pairs = get_face_pairs()
-correct_found_pairs = 0
-print(len(face_pairs))
+def find_keypoints(image: Image):
+    gray_image = cv2.cvtColor(np.asarray(image), cv2.COLOR_BGR2GRAY)
+    faces = server.hog_svm_detector(gray_image)
+    box_and_keypoints_list = []
+    for face in faces:
+        all_landmarks = server.hog_svm_shape_predictor(gray_image, face)
+        box = [face.left(), face.top(), face.width(), face.height()]
+        face_keypoints = server.calculate_face_keypoints(all_landmarks)
+        face_shape_landmarks = server.calculate_face_shape_landmarks(all_landmarks)
+        face_encoding = server.calculate_face_encoding(np.asarray(image), box)
+        box_and_keypoints_list.append((box, face_keypoints, face_shape_landmarks, face_encoding))
 
-for pair in face_pairs:
-    pair0 = Image.fromarray((pair[0] * 255).astype(np.uint8))
-    pair1 = Image.fromarray((pair[1] * 255).astype(np.uint8))
-    if recognize_faces(pair0, pair1) == 1:
-        correct_found_pairs += 1
-
-print(str(correct_found_pairs) + '/' + str(len(face_pairs)))
+    return box_and_keypoints_list
 
 
+def run_pairs_with_filter(face_pairs):
+    correct_found_pairs = 0
+    for pair in face_pairs:
+        if recognize_faces(pair[0], pair[1]) == 1:
+            correct_found_pairs += 1
+
+    print(str(correct_found_pairs) + '/' + str(len(face_pairs)))
+    return correct_found_pairs
 
 
+def plot_results(title: str, categories, values):
+
+    # Create bar chart
+    plt.figure(figsize=(8, 6))
+    plt.bar(categories, values, color='skyblue')
+    plt.ylim(0, 1.0)
+
+    # Title and labels
+    plt.title(title)
+    plt.xlabel('Modification Operations')
+    plt.ylabel('Proportion detected')
+
+    # Show plot
+    plt.xticks(rotation=45)  # Rotate x-axis labels for better visibility
+    plt.tight_layout()
+    plt.savefig('../documentation/images/' + title.replace(" ", ""), bbox_inches='tight')
+    plt.close()
+
+
+def run_analysis():
+    face_pairs = get_face_pairs()
+    face_pairs_pil_with_keypoints = []
+
+    face_pairs = face_pairs[1:30]
+
+    for pair in face_pairs:
+        pil_0 = Image.fromarray((pair[0] * 255).astype(np.uint8))
+        pil_1 = Image.fromarray((pair[1] * 255).astype(np.uint8))
+        keypoints = find_keypoints(pil_1)
+        face_pairs_pil_with_keypoints.append((pil_0, pil_1, keypoints))
+
+    print("Calculated Keypoints")
+
+    cur_pairs = []
+    for pair in face_pairs_pil_with_keypoints:
+        cur_pairs.append((pair[0], pair[1]))
+    unmodified_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
+    print("Finished match calculation")
+
+    cur_pairs = []
+    for pair in face_pairs_pil_with_keypoints:
+        cur_pairs.append((pair[0], server.apply_sunglasses(pair[1], pair[2])))
+    sunglasses_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
+    print("Finished match calculation")
+
+    categories = ["Unmodified Image", "Sunglasses"]
+    values = [unmodified_result, sunglasses_result]
+
+    plot_results("Face Recognition Analysis", categories, values)
+
+
+run_analysis()
