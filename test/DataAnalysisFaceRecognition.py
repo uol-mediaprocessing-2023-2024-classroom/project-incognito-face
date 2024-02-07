@@ -127,12 +127,42 @@ def run_analysis():
 
     cur_pairs = []
     for pair in face_pairs_pil_with_keypoints:
+        cur_pairs.append((pair[0], server.apply_cow_pattern(pair[1], pair[2])))
+    cow_pattern_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
+    print("Finished match calculation")
+
+    cur_pairs = []
+    for pair in face_pairs_pil_with_keypoints:
+        cur_pairs.append((pair[0], server.apply_salt_n_pepper(pair[1], pair[2])))
+    salt_and_pepper_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
+    print("Finished match calculation")
+
+    cur_pairs = []
+    for pair in face_pairs_pil_with_keypoints:
+        cur_pairs.append((pair[0], server.apply_pixelate(pair[1], pair[2])))
+    pixelate_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
+    print("Finished match calculation")
+
+    cur_pairs = []
+    for pair in face_pairs_pil_with_keypoints:
+        cur_pairs.append((pair[0], server.apply_blur(pair[1], pair[2])))
+    blur_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
+    print("Finished match calculation")
+
+    cur_pairs = []
+    for pair in face_pairs_pil_with_keypoints:
         cur_pairs.append((pair[0], server.apply_sunglasses(pair[1], pair[2])))
     sunglasses_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
     print("Finished match calculation")
 
-    categories = ["Unmodified Image", "Sunglasses"]
-    values = [unmodified_result, sunglasses_result]
+    cur_pairs = []
+    for pair in face_pairs_pil_with_keypoints:
+        cur_pairs.append((pair[0], server.apply_medicine_mask(pair[1], pair[2])))
+    medicine_mask_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
+    print("Finished match calculation")
+
+    categories = ["Unmodified Image", "Cow Pattern", "Salt_&_Pepper", "Pixelate", "Blur", "Sunglasses", "Medicine Mask"]
+    values = [unmodified_result, cow_pattern_result, salt_and_pepper_result, pixelate_result, blur_result, sunglasses_result, medicine_mask_result]
 
     plot_results("Face Recognition Analysis", categories, values)
 
