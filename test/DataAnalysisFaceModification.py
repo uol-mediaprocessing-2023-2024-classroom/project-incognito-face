@@ -14,6 +14,7 @@ from mtcnn.mtcnn import MTCNN
 from PIL import Image, ImageFilter, ImageDraw
 import numpy
 import sys
+import logging
 
 sys.path.append('../backend/app')
 # we always call serverfrom here.
@@ -23,7 +24,7 @@ import main as server
 
 # this is relative based on new directory from change before!!!!
 # os.chdir('../test')
-
+logging.basicConfig(level=logging.INFO)
 
 ## Counting
 
@@ -51,6 +52,7 @@ def count_detected_faces_hog(image_mod_fn, needs_keypoints=True, **kwargs):
     faces = get_faces()
     detector = dlib.get_frontal_face_detector()
     counter_faces = 0
+    logging.info(f'kwargs: {kwargs}')
 
     for possibleFace in faces.images:
         scaled_rgb_image = (possibleFace * 255).astype(np.uint8)
@@ -110,7 +112,7 @@ def image_modification_plot_hog_and_alpha(title: str, modification_description: 
         values.append(count_detected_faces_hog(lambda x: x, False))
         for alpha_value in alpha_values:
             categories.append(modification_description + ' with alpha of ' + str(alpha_value))
-            values.append(count_detected_faces_hog(image_mod_fn, alpha_value))
+            values.append(count_detected_faces_hog(image_mod_fn, needs_keypoints = True, parameters = alpha_value))
 
     # Create bar chart
     plt.figure(figsize=(8, 6))
@@ -130,26 +132,26 @@ def image_modification_plot_hog_and_alpha(title: str, modification_description: 
 
 
 #Setup
-plot_img = get_faces().images[0]
-scaled_plot = (plot_img * 255).astype(np.uint8)
-pil_img = Image.fromarray(scaled_plot)
-pil_img_copy = pil_img.copy()
-keypoints_plot_img = find_keypoints(pil_img)
+#plot_img = get_faces().images[0]
+#scaled_plot = (plot_img * 255).astype(np.uint8)
+#pil_img = Image.fromarray(scaled_plot)
+#pil_img_copy = pil_img.copy()
+#keypoints_plot_img = find_keypoints(pil_img)
 
 # Cowface
 
 # plot_before_and_after_modification(pil_img_copy,
 #                                    server.apply_cow_pattern(pil_img, keypoints_plot_img, alpha_of_cow_pattern=80),
 #                                    'Cow Mask with Alpha of 45')
-# image_modification_plot_hog_and_alpha('Cow Mask Modification', 'Cow Mask', server.apply_cow_pattern,
-#                                       [50, 100, 150, 200, 250])
+#image_modification_plot_hog_and_alpha('Cow Mask Modification', 'Cow Mask', server.apply_cow_pattern,
+#                                       alpha_values = [50, 100, 150, 200, 250])
 
 # Salt and Pepper
 # plot_before_and_after_modification(pil_img_copy,
 #                                    server.apply_salt_n_pepper(pil_img, keypoints_plot_img, alpha_of_salt_n_pepper=45),
 #                                    'Salt and Pepper with alpha of 45')
-# image_modification_plot_hog_and_alpha('Salt and Pepper Modification', 'Salt and Pepper', server.apply_salt_n_pepper,
-#                                        [50, 100, 150, 200, 250])
+#image_modification_plot_hog_and_alpha('Salt and Pepper Modification', 'Salt and Pepper', server.apply_salt_n_pepper,
+#                                       alpha_values = [50, 100, 150, 200, 250])
 
 # Sunglasses
 # plot_before_and_after_modification(pil_img_copy,
@@ -172,7 +174,7 @@ keypoints_plot_img = find_keypoints(pil_img)
 
 # Pixelate
 # plot_before_and_after_modification(pil_img_copy, server.apply_pixelate(pil_img, keypoints_plot_img, pixel_size=2), 'Pixelate')
-#image_modification_plot_hog_and_alpha('Pixelate Modification', 'Applied Pixelate', server.apply_pixelate, [2,4,6,8])
+#image_modification_plot_hog_and_alpha('Pixelate Modification', 'Applied Pixelate', server.apply_pixelate, alpha_values = [2,4,6,8])
 
 # Blur
 #plot_before_and_after_modification(pil_img_copy, server.apply_blur(pil_img, keypoints_plot_img), 'Box Blur')
