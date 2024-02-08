@@ -545,8 +545,8 @@ def process_face_recognition(orig_hash, orig_base64, mod_base64):
     }
 
 
-def apply_blur(image: Image, keypoints, only_face=True) -> Image:
-    modified_image = image.filter(ImageFilter.BoxBlur(10))
+def apply_blur(image: Image, keypoints, only_face=True, strength=10) -> Image:
+    modified_image = image.filter(ImageFilter.BoxBlur(strength))
     if only_face:
         return swap_images_at_face_position(image, keypoints, modified_image)
     else:
@@ -618,6 +618,8 @@ def apply_pixelate(image: Image, keypoints, only_face=True, pixel_size=10) -> Im
 
 
 def apply_morph_eyes(image: Image, keypoints, radius=75, morph_strength=10.0) -> Image:
+    if len(keypoints) == 0:
+        return image
     image_cv = np.array(image)
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
     eye_points = [face_keypoints[key] for _, face_keypoints, _, _ in keypoints for key in ['left_eye', 'right_eye']]
@@ -627,6 +629,8 @@ def apply_morph_eyes(image: Image, keypoints, radius=75, morph_strength=10.0) ->
 
 
 def apply_morph_mouth(image: Image, keypoints, radius=75, morph_strength=10.0) -> Image:
+    if len(keypoints) == 0:
+        return image
     image_cv = np.array(image)
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
     mouth_points = [face_keypoints[key] for _, face_keypoints, _, _ in keypoints for key in
@@ -637,6 +641,8 @@ def apply_morph_mouth(image: Image, keypoints, radius=75, morph_strength=10.0) -
 
 
 def apply_morph_all(image: Image, keypoints, radius=75, morph_strength=10.0) -> Image:
+    if len(keypoints) == 0:
+        return image
     image_cv = np.array(image)
     image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
     all_points = [point for _, face_keypoints, outline, _ in keypoints for key, point in face_keypoints.items()] + [pt

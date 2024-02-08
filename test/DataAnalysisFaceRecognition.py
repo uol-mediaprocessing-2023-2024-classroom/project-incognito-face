@@ -109,7 +109,7 @@ def run_analysis():
     face_pairs = get_face_pairs()
     face_pairs_pil_with_keypoints = []
 
-    face_pairs = face_pairs[1:30]
+    # face_pairs = face_pairs[1:5]
 
     for pair in face_pairs:
         pil_0 = Image.fromarray((pair[0] * 255).astype(np.uint8))
@@ -121,50 +121,100 @@ def run_analysis():
 
     cur_pairs = []
     for pair in face_pairs_pil_with_keypoints:
-        cur_pairs.append((pair[0], pair[1]))
+        cur_pairs.append((pair[0], pair[1].copy()))
     unmodified_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
     print("Finished match calculation")
 
+    plt.imshow(cur_pairs[0][0])
+    plt.show()
+    plt.imshow(cur_pairs[0][1])
+    plt.show()
+
     cur_pairs = []
     for pair in face_pairs_pil_with_keypoints:
-        cur_pairs.append((pair[0], server.apply_cow_pattern(pair[1], pair[2])))
+        cur_pairs.append((pair[0], server.apply_cow_pattern(pair[1].copy(), pair[2])))
     cow_pattern_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
     print("Finished match calculation")
 
+    plt.imshow(cur_pairs[0][1])
+    plt.show()
+
     cur_pairs = []
     for pair in face_pairs_pil_with_keypoints:
-        cur_pairs.append((pair[0], server.apply_salt_n_pepper(pair[1], pair[2])))
+        cur_pairs.append((pair[0], server.apply_salt_n_pepper(pair[1].copy(), pair[2], alpha_of_salt_n_pepper=75)))
     salt_and_pepper_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
     print("Finished match calculation")
 
+    plt.imshow(cur_pairs[0][1])
+    plt.show()
+
     cur_pairs = []
     for pair in face_pairs_pil_with_keypoints:
-        cur_pairs.append((pair[0], server.apply_pixelate(pair[1], pair[2])))
+        cur_pairs.append((pair[0], server.apply_pixelate(pair[1].copy(), pair[2], pixel_size=5)))
     pixelate_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
     print("Finished match calculation")
 
+    plt.imshow(cur_pairs[0][1])
+    plt.show()
+
     cur_pairs = []
     for pair in face_pairs_pil_with_keypoints:
-        cur_pairs.append((pair[0], server.apply_blur(pair[1], pair[2])))
+        cur_pairs.append((pair[0], server.apply_blur(pair[1].copy(), pair[2], strength=5)))
     blur_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
     print("Finished match calculation")
 
+    plt.imshow(cur_pairs[0][1])
+    plt.show()
+
     cur_pairs = []
     for pair in face_pairs_pil_with_keypoints:
-        cur_pairs.append((pair[0], server.apply_sunglasses(pair[1], pair[2])))
+        cur_pairs.append((pair[0], server.apply_sunglasses(pair[1].copy(), pair[2])))
     sunglasses_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
     print("Finished match calculation")
 
+    plt.imshow(cur_pairs[0][1])
+    plt.show()
+
     cur_pairs = []
     for pair in face_pairs_pil_with_keypoints:
-        cur_pairs.append((pair[0], server.apply_medicine_mask(pair[1], pair[2])))
+        cur_pairs.append((pair[0], server.apply_medicine_mask(pair[1].copy(), pair[2])))
     medicine_mask_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
     print("Finished match calculation")
 
-    categories = ["Unmodified Image", "Cow Pattern", "Salt_&_Pepper", "Pixelate", "Blur", "Sunglasses", "Medicine Mask"]
-    values = [unmodified_result, cow_pattern_result, salt_and_pepper_result, pixelate_result, blur_result, sunglasses_result, medicine_mask_result]
+    plt.imshow(cur_pairs[0][1])
+    plt.show()
+
+    cur_pairs = []
+    for pair in face_pairs_pil_with_keypoints:
+        cur_pairs.append((pair[0], server.apply_morph_eyes(pair[1].copy(), pair[2])))
+    morph_eyes_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
+    print("Finished match calculation")
+
+    plt.imshow(cur_pairs[0][1])
+    plt.show()
+
+    cur_pairs = []
+    for pair in face_pairs_pil_with_keypoints:
+        cur_pairs.append((pair[0], server.apply_morph_mouth(pair[1].copy(), pair[2])))
+    morph_mouth_result = run_pairs_with_filter(cur_pairs) / len(face_pairs_pil_with_keypoints)
+    print("Finished match calculation")
+
+    plt.imshow(cur_pairs[0][1])
+    plt.show()
+
+    categories = ["Unmodified Image", "Cow Pattern", "Salt_&_Pepper", "Pixelate", "Blur", "Sunglasses", "Medicine Mask", "Morph Eyes", "Morph mouth"]
+    values = [unmodified_result, cow_pattern_result, salt_and_pepper_result, pixelate_result, blur_result, sunglasses_result, medicine_mask_result, morph_eyes_result, morph_mouth_result]
 
     plot_results("Face Recognition Analysis", categories, values)
 
-
 run_analysis()
+
+# 918/1100
+# 10/1100
+# 15/1100
+# 183/1100
+# 198/1100
+# 486/1100
+# 22/1100
+# 11/1100
+# 339/1100
