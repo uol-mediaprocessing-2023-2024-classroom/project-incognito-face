@@ -1,6 +1,5 @@
 import os
 import sys
-from typing import Callable
 
 import cv2
 import dlib
@@ -202,7 +201,7 @@ def run_analysis():
     plt.imshow(cur_pairs[0][1])
     plt.show()
 
-    categories = ["Unmodified Image", "Cow Pattern", "Salt_&_Pepper", "Pixelate", "Blur", "Sunglasses", "Medicine Mask", "Morph Eyes", "Morph mouth"]
+    categories = ["Unmodified Image", "Cow Pattern", "Salt_&_Pepper", "Pixelate", "Blur", "Sunglasses", "Medicine Mask", "Morph Eyes", "Morph Mouth"]
     values = [unmodified_result, cow_pattern_result, salt_and_pepper_result, pixelate_result, blur_result, sunglasses_result, medicine_mask_result, morph_eyes_result, morph_mouth_result]
 
     plot_results("Face Recognition Analysis", categories, values)

@@ -132,11 +132,11 @@ def image_modification_plot_hog_and_alpha(title: str, modification_description: 
 
 
 #Setup
-#plot_img = get_faces().images[0]
-#scaled_plot = (plot_img * 255).astype(np.uint8)
-#pil_img = Image.fromarray(scaled_plot)
-#pil_img_copy = pil_img.copy()
-#keypoints_plot_img = find_keypoints(pil_img)
+# plot_img = get_faces().images[0]
+# scaled_plot = (plot_img * 255).astype(np.uint8)
+# pil_img = Image.fromarray(scaled_plot)
+# pil_img_copy = pil_img.copy()
+# keypoints_plot_img = find_keypoints(pil_img)
 
 # Cowface
 
@@ -180,3 +180,14 @@ def image_modification_plot_hog_and_alpha(title: str, modification_description: 
 #plot_before_and_after_modification(pil_img_copy, server.apply_blur(pil_img, keypoints_plot_img), 'Box Blur')
 #image_modification_plot_hog_and_alpha('Box Blur Modification', ' Box Blur with radius of 1', server.apply_blur)
 
+# Morph Eyes
+# plot_before_and_after_modification(pil_img_copy,
+#                                    server.apply_morph_eyes(pil_img, keypoints_plot_img, morph_strength=5), 'Morph Eyes with morph strength of 5')
+
+# Morph Mouth
+# plot_before_and_after_modification(pil_img_copy,
+#                                    server.apply_morph_mouth(pil_img, keypoints_plot_img, morph_strength=5), 'Morph Mouth with morph strength of 5')
+
+# Morph All
+# plot_before_and_after_modification(pil_img_copy,
+#                                    server.apply_morph_all(pil_img, keypoints_plot_img, morph_strength=5), 'Morph All with morph strength of 5')
